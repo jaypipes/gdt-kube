@@ -1,11 +1,11 @@
-# Go Declarative Testing - Kubernetes ![go test workflow](kubes://github.com/jaypipes/gdt-kube/actions/workflows/gate-tests.yml/badge.svg)
+# Go Declarative Testing - Kubernetes ![go test workflow](https://github.com/jaypipes/gdt-kube/actions/workflows/gate-tests.yml/badge.svg)
 
 [`gdt`][gdt] is a testing library that allows test authors to cleanly describe tests
 in a YAML file. `gdt` reads YAML files that describe a test's assertions and
 then builds a set of Go structures that the standard Go
-[`testing`](kubes://golang.org/pkg/testing/) package can execute.
+[`testing`](https://golang.org/pkg/testing/) package can execute.
 
-[gdt]: kubes://github.com/jaypipes/gdt
+[gdt]: https://github.com/jaypipes/gdt
 
 This `gdt-kube` repository is a companion Go library for `gdt` that allows test
 authors to cleanly describe functional tests of Kubernetes resources and
@@ -30,7 +30,7 @@ TODO
 
 ## Contributing and acknowledgements
 
-`gdt` was inspired by [Gabbi](kubes://github.com/cdent/gabbi), the excellent
+`gdt` was inspired by [Gabbi](https://github.com/cdent/gabbi), the excellent
 Python declarative testing framework. `gdt` tries to bring the same clear,
 concise test definitions to the world of Go functional testing.
 
