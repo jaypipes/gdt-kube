@@ -5,16 +5,26 @@
 package kube
 
 import (
+	"os"
+
 	"github.com/jaypipes/gdt-core/errors"
 	"gopkg.in/yaml.v3"
 )
 
 type kubeDefaults struct {
 	// Config is the path of the kubeconfig to use in executing Kubernetes
-	// client calls. If empty, typical kubeconfig path-finding is used.
+	// client calls. If empty, typical kubeconfig path-finding is used, meaning
+	// that the following precedence is used:
+	//
+	// 1) KUBECONFIG environment variable pointing at a file.
+	// 2) In-cluster config if running in cluster.
+	// 3) $HOME/.kube/config if exists.
+	//
+	// This value can be overridden with the `Spec.Kube.Config` field.
 	Config string `yaml:"config,omitempty"`
 	// Context is the name of the kubecontext to use. If empty, the kubecontext
-	// marked default in the kubeconfig is used.
+	// marked default in the kubeconfig is used. This can be overridden with
+	// the `Spec.Kube.Context` field.
 	Context string `yaml:"context,omitempty"`
 }
 
@@ -38,8 +48,8 @@ func (d *Defaults) UnmarshalYAML(node *yaml.Node) error {
 		valNode := node.Content[i+1]
 		switch key {
 		case "kube":
-			if valNode.Kind != yaml.ScalarNode {
-				return errors.ExpectedScalarAt(valNode)
+			if valNode.Kind != yaml.MappingNode {
+				return errors.ExpectedMapAt(valNode)
 			}
 			hd := kubeDefaults{}
 			if err := valNode.Decode(&hd); err != nil {
@@ -48,6 +58,24 @@ func (d *Defaults) UnmarshalYAML(node *yaml.Node) error {
 			d.kubeDefaults = hd
 		default:
 			continue
+		}
+	}
+	return d.validate()
+}
+
+// validate determines if any specified defaults are valid.
+func (d *Defaults) validate() error {
+	if d.Config != "" {
+		f, err := os.Open(d.Config)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return KubeConfigNotFound(d.Config)
+			}
+			return err
+		}
+		_, err = f.Stat()
+		if err != nil {
+			return err
 		}
 	}
 	return nil

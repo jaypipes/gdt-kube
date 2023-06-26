@@ -35,4 +35,13 @@ var (
 			"(e.g. `create`, `apply` or `delete`) in the `kube` object. ",
 		gdterrors.ErrInvalid,
 	)
+	ErrInvalidKubeConfigNotFound = fmt.Errorf(
+		"%w: specified kube config path not found",
+		gdterrors.ErrInvalid,
+	)
 )
+
+// KubeConfigNotFound returns ErrInvalidKubeConfigNotFound for a given filepath
+func KubeConfigNotFound(path string) error {
+	return fmt.Errorf("%w: %s", ErrInvalidKubeConfigNotFound, path)
+}

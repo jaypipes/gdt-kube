@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/jaypipes/gdt-core/spec"
+	"k8s.io/client-go/rest"
 )
 
 // KubeSpec is the complex type containing all of the Kubernetes-specific
@@ -42,7 +43,8 @@ type KubeSpec struct {
 // Spec describes a test of a *single* Kubernetes API request and response.
 type Spec struct {
 	spec.Spec
-	defaults *Defaults
+	defaults   *Defaults
+	kubeConfig *rest.Config
 	// Kube is the complex type containing all of the Kubernetes-specific
 	// actions and assertions. Most users will use the `kube.create`,
 	// `kube.apply` and `kube.describe` shortcut fields.
