@@ -6,6 +6,7 @@ package kube_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -66,6 +67,7 @@ func TestUnknownKubeContextInDefaults(t *testing.T) {
 }
 
 func TestListPodsEmpty(t *testing.T) {
+	skipIfNoDocker(t)
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -92,6 +94,7 @@ func TestListPodsEmpty(t *testing.T) {
 }
 
 func TestGetPodNotFound(t *testing.T) {
+	skipIfNoDocker(t)
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -115,4 +118,10 @@ func TestGetPodNotFound(t *testing.T) {
 
 	err = s.Run(ctx, t)
 	assert.Nil(err)
+}
+
+func skipIfNoDocker(t *testing.T) {
+	if _, err := exec.LookPath("docker"); err != nil {
+		t.Skipf("no docker available in order to run KinD")
+	}
 }
