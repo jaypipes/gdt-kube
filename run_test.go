@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	gdtcontext "github.com/jaypipes/gdt-core/context"
@@ -121,7 +122,8 @@ func TestGetPodNotFound(t *testing.T) {
 }
 
 func skipIfNoDocker(t *testing.T) {
-	if _, err := exec.LookPath("docker"); err != nil {
-		t.Skipf("no docker available in order to run KinD")
+	_, err := exec.LookPath("docker")
+	if err != nil || runtime.GOOS == "windows" {
+		t.Skipf("no docker available in order to run KinD or Windows docker is hobbled")
 	}
 }
