@@ -8,8 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jaypipes/gdt-core/spec"
-	"k8s.io/client-go/rest"
+	gdttypes "github.com/jaypipes/gdt-core/types"
 )
 
 // KubeSpec is the complex type containing all of the Kubernetes-specific
@@ -38,13 +37,23 @@ type KubeSpec struct {
 	//     having such a label.
 	//   * the string `--all` to delete all resources of that kind.
 	Delete string `yaml:"delete,omitempty"`
+	// Config is the path of the kubeconfig to use in executing Kubernetes
+	// client calls for this Spec. If empty, the `kube` defaults' `config`
+	// value will be used. If that is empty, the following precedence is used:
+	//
+	// 1) KUBECONFIG environment variable pointing at a file.
+	// 2) In-cluster config if running in cluster.
+	// 3) $HOME/.kube/config if exists.
+	Config string `yaml:"config,omitempty"`
+	// Context is the name of the kubecontext to use for this Spec. If empty,
+	// the `kube` defaults' `context` value will be used. If that is empty, the
+	// kubecontext marked default in the kubeconfig is used.
+	Context string `yaml:"context,omitempty"`
 }
 
 // Spec describes a test of a *single* Kubernetes API request and response.
 type Spec struct {
-	spec.Spec
-	defaults   *Defaults
-	kubeConfig *rest.Config
+	gdttypes.Spec
 	// Kube is the complex type containing all of the Kubernetes-specific
 	// actions and assertions. Most users will use the `kube.create`,
 	// `kube.apply` and `kube.describe` shortcut fields.
@@ -105,8 +114,16 @@ func (s *Spec) Title() string {
 	return ""
 }
 
-// poorman's quick-check of whether the action string is a file path or a YAML
+// poor man's quick-check of whether the action string is a file path or a YAML
 // string...
 func probablyFilePath(subject string) bool {
 	return strings.ContainsRune(subject, '\n') || strings.ContainsRune(subject, '\r')
+}
+
+func (s *Spec) SetBase(b gdttypes.Spec) {
+	s.Spec = b
+}
+
+func (s *Spec) Base() *gdttypes.Spec {
+	return &s.Spec
 }

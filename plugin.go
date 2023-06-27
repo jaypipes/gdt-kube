@@ -30,8 +30,8 @@ func (p *plugin) Defaults() yaml.Unmarshaler {
 	return &Defaults{}
 }
 
-func (p *plugin) Specs() []gdttypes.Spec {
-	return []gdttypes.Spec{&Spec{}}
+func (p *plugin) Specs() []gdttypes.TestUnit {
+	return []gdttypes.TestUnit{&Spec{}}
 }
 
 // Plugin returns the Kubernetes gdt plugin

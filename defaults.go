@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/jaypipes/gdt-core/errors"
+	gdttypes "github.com/jaypipes/gdt-core/types"
 	"gopkg.in/yaml.v3"
 )
 
@@ -79,4 +80,16 @@ func (d *Defaults) validate() error {
 		}
 	}
 	return nil
+}
+
+// fromBaseDefaults returns an gdt-kube plugin-specific Defaults from a Spec
+func fromBaseDefaults(base *gdttypes.Defaults) *Defaults {
+	if base == nil {
+		return nil
+	}
+	d := base.For(pluginName)
+	if d == nil {
+		return nil
+	}
+	return d.(*Defaults)
 }

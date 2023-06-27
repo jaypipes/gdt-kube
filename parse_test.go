@@ -13,7 +13,6 @@ import (
 	gdtcontext "github.com/jaypipes/gdt-core/context"
 	"github.com/jaypipes/gdt-core/errors"
 	"github.com/jaypipes/gdt-core/scenario"
-	"github.com/jaypipes/gdt-core/spec"
 	gdttypes "github.com/jaypipes/gdt-core/types"
 	gdtkube "github.com/jaypipes/gdt-kube"
 	"github.com/stretchr/testify/assert"
@@ -166,11 +165,12 @@ spec:
      image: nginx:1.7.9
 `
 
-	expTests := []gdttypes.Spec{
+	expTests := []gdttypes.TestUnit{
 		&gdtkube.Spec{
-			Spec: spec.Spec{
-				Index: 0,
-				Name:  "create a pod from YAML using kube.create shortcut",
+			Spec: gdttypes.Spec{
+				Index:    0,
+				Name:     "create a pod from YAML using kube.create shortcut",
+				Defaults: &gdttypes.Defaults{},
 			},
 			KubeCreate: podYAML,
 			Kube: &gdtkube.KubeSpec{
@@ -178,9 +178,10 @@ spec:
 			},
 		},
 		&gdtkube.Spec{
-			Spec: spec.Spec{
-				Index: 1,
-				Name:  "apply a pod from a file using kube.apply shortcut",
+			Spec: gdttypes.Spec{
+				Index:    1,
+				Name:     "apply a pod from a file using kube.apply shortcut",
+				Defaults: &gdttypes.Defaults{},
 			},
 			KubeApply: "testdata/manifests/pod.yaml",
 			Kube: &gdtkube.KubeSpec{
@@ -188,18 +189,20 @@ spec:
 			},
 		},
 		&gdtkube.Spec{
-			Spec: spec.Spec{
-				Index: 2,
-				Name:  "create a pod from YAML",
+			Spec: gdttypes.Spec{
+				Index:    2,
+				Name:     "create a pod from YAML",
+				Defaults: &gdttypes.Defaults{},
 			},
 			Kube: &gdtkube.KubeSpec{
 				Create: podYAML,
 			},
 		},
 		&gdtkube.Spec{
-			Spec: spec.Spec{
-				Index: 3,
-				Name:  "apply a pod from a file",
+			Spec: gdttypes.Spec{
+				Index:    3,
+				Name:     "apply a pod from a file",
+				Defaults: &gdttypes.Defaults{},
 			},
 			Kube: &gdtkube.KubeSpec{
 				Apply: "testdata/manifests/pod.yaml",
