@@ -5,6 +5,8 @@
 package kube
 
 import (
+	"strings"
+
 	"github.com/jaypipes/gdt-core/errors"
 	gdttypes "github.com/jaypipes/gdt-core/types"
 	"github.com/samber/lo"
@@ -48,7 +50,7 @@ func (s *Spec) UnmarshalYAML(node *yaml.Node) error {
 			if valNode.Kind != yaml.ScalarNode {
 				return errors.ExpectedScalarAt(valNode)
 			}
-			s.KubeDelete = valNode.Value
+			s.KubeDelete = strings.TrimSpace(valNode.Value)
 		default:
 			if lo.Contains(gdttypes.BaseSpecFields, key) {
 				continue
@@ -113,10 +115,13 @@ func expandShortcut(s *Spec) {
 	s.Kube = ks
 }
 
-// validateKubeSpec ensures that the test author has specified only a single
-// action in the KubeSpec.
-func validateKubeSpec(s *Spec) error {
+// moreThanOneAction returns true if the test author has specified more than a
+// single action in the KubeSpec.
+func moreThanOneAction(s *Spec) bool {
 	foundActions := 0
+	if s.Kube.Get != "" {
+		foundActions += 1
+	}
 	if s.Kube.Create != "" {
 		foundActions += 1
 	}
@@ -126,8 +131,38 @@ func validateKubeSpec(s *Spec) error {
 	if s.Kube.Delete != "" {
 		foundActions += 1
 	}
-	if foundActions > 1 {
+	return foundActions > 1
+}
+
+// validateKubeSpec ensures that the test author has specified only a single
+// action in the KubeSpec.
+func validateKubeSpec(s *Spec) error {
+	if moreThanOneAction(s) {
 		return ErrInvalidMoreThanOneKubeAction
+	}
+	if s.Kube.Get != "" {
+		if err := validateResourceIdentifier(s.Kube.Get); err != nil {
+			return err
+		}
+	}
+	if s.Kube.Delete != "" {
+		if err := validateResourceIdentifier(s.Kube.Delete); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateResurceIdentifier returns an error if the supplied `Get` or `Delete`
+// argument contains an ill-formed Kind, Alias or Kind/Name specifier. Only a
+// single Kind may be specified (i.e. no commas or spaces are allowed in the
+// supplied string.)
+func validateResourceIdentifier(subject string) error {
+	if strings.ContainsAny(subject, " ,;") {
+		return InvalidResourceSpecifier(subject)
+	}
+	if strings.Count(subject, "/") > 1 {
+		return InvalidResourceSpecifier(subject)
 	}
 	return nil
 }

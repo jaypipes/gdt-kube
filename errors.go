@@ -35,8 +35,17 @@ var (
 			"(e.g. `create`, `apply` or `delete`) in the `kube` object. ",
 		gdterrors.ErrInvalid,
 	)
+	// ErrInvalidKubeConfigNotFound is returned when a kubeconfig path points
+	// to a file that does not exist.
 	ErrInvalidKubeConfigNotFound = fmt.Errorf(
 		"%w: specified kube config path not found",
+		gdterrors.ErrInvalid,
+	)
+	// ErrInvalidResourceSpecifier is returned when the test author uses a
+	// resource specifier for the `kube.get` or `kube.delete` fields that is
+	// not valid.
+	ErrInvalidResourceSpecifier = fmt.Errorf(
+		"%w: invalid resource specifier",
 		gdterrors.ErrInvalid,
 	)
 )
@@ -44,4 +53,10 @@ var (
 // KubeConfigNotFound returns ErrInvalidKubeConfigNotFound for a given filepath
 func KubeConfigNotFound(path string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidKubeConfigNotFound, path)
+}
+
+// InvalidResourceSpecifier returns ErrInvalidResourceSpecifier for a given
+// supplied resource specifier.
+func InvalidResourceSpecifier(subject string) error {
+	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifier, subject)
 }

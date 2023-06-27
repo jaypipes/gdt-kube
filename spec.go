@@ -16,7 +16,8 @@ import (
 // and `kube.describe` shortcut fields.
 type KubeSpec struct {
 	// Namespace is a string indicating the Kubernetes namespace to use when
-	// calling the Kubernetes API. If empty, the default namespace is used.
+	// calling the Kubernetes API. If empty, any namespace specified in the
+	// Defaults is used and then the string "default" is used.
 	Namespace string `yaml:"namespace,omitempty"`
 	// Create is a string containing a file path or raw YAML content describing
 	// a Kubernetes resource to call `kubectl create` with.
@@ -37,6 +38,18 @@ type KubeSpec struct {
 	//     having such a label.
 	//   * the string `--all` to delete all resources of that kind.
 	Delete string `yaml:"delete,omitempty"`
+	// Get is a string containing an argument to `kubectl get` and must be one
+	// of the following:
+	//
+	// - a file path to a manifest that will be read and the resources within
+	//   retrieved via `kubectl get`
+	// - a resource kind or kind alias, e.g. "pods", "po", followed by one of
+	//   the following:
+	//   * a space or `/` character followed by the resource name to get only a
+	//     resource with that name.
+	//   * a space followed by `-l ` followed by a label to get resources
+	//     having such a label.
+	Get string `yaml:"get,omitempty"`
 	// Config is the path of the kubeconfig to use in executing Kubernetes
 	// client calls for this Spec. If empty, the `kube` defaults' `config`
 	// value will be used. If that is empty, the following precedence is used:
@@ -49,6 +62,9 @@ type KubeSpec struct {
 	// the `kube` defaults' `context` value will be used. If that is empty, the
 	// kubecontext marked default in the kubeconfig is used.
 	Context string `yaml:"context,omitempty"`
+	// Assert houses the various assertions to be made about the kube client
+	// call (Create, Apply, Get, etc)
+	Assert *Assertions `yaml:"assert,omitempty"`
 }
 
 // Spec describes a test of a *single* Kubernetes API request and response.

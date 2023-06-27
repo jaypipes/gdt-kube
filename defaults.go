@@ -27,6 +27,9 @@ type kubeDefaults struct {
 	// marked default in the kubeconfig is used. This can be overridden with
 	// the `Spec.Kube.Context` field.
 	Context string `yaml:"context,omitempty"`
+	// Namespace is the name of the Kubernetes namespace to use by default.
+	// This can be overridden with the `Spec.Kube.Namespace` field.
+	Namespace string `yaml:"namespace,omitempty"`
 }
 
 // Defaults is the known HTTP plugin defaults collection
