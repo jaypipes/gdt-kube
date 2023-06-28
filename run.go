@@ -22,15 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
-	"k8s.io/client-go/dynamic"
 )
 
 // Run executes the test described by the Kubernetes test. A new Kubernetes
 // client request is made during this call.
 func (s *Spec) Run(ctx context.Context, t *testing.T) error {
-	var err error
-	var c *dynamic.DynamicClient
-	c, err = s.Client(ctx)
+	c, err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
@@ -56,13 +53,33 @@ func (s *Spec) Run(ctx context.Context, t *testing.T) error {
 func (s *Spec) runGet(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
+	c *connection,
 ) error {
+	assert := assert.New(t)
+	assertions := s.Kube.Assert
+
 	kind, name := splitKindName(s.Kube.Get)
-	if name == "" {
-		return s.doList(ctx, t, c, kind, s.Namespace())
+	gvk := schema.GroupVersionKind{
+		Kind: kind,
 	}
-	return s.doGet(ctx, t, c, kind, name, s.Namespace())
+	res, err := c.gvrFromGVK(gvk)
+	if assertions != nil {
+		if assertions.Error != "" {
+			assertError(t, assertions.Error, err)
+		}
+		if assertions.Unknown {
+			assert.ErrorIs(err, ErrRuntimeResourceUnknown)
+		}
+	} else {
+		assert.Nil(err)
+	}
+	if err != nil {
+		return nil
+	}
+	if name == "" {
+		return s.doList(ctx, t, c, res, s.Namespace())
+	}
+	return s.doGet(ctx, t, c, res, name, s.Namespace())
 }
 
 // doList performs the List() call and assertion check for a supplied resource
@@ -70,26 +87,28 @@ func (s *Spec) runGet(
 func (s *Spec) doList(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
-	kind string,
+	c *connection,
+	res schema.GroupVersionResource,
 	namespace string,
 ) error {
-	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	list, err := c.Resource(res).Namespace(namespace).List(
+	assert := assert.New(t)
+	assertions := s.Kube.Assert
+	list, err := c.client.Resource(res).Namespace(namespace).List(
 		ctx,
 		metav1.ListOptions{},
 	)
-	assertions := s.Kube.Assert
+	require.Nil(t, err)
 	if assertions != nil {
 		if assertions.Error != "" {
 			assertError(t, assertions.Error, err)
 		}
-		if (assertions.Len != nil && *assertions.Len == 0) ||
-			assertions.NotFound {
+		if assertions.Len != nil {
 			assertLen(t, *assertions.Len, len(list.Items))
+		} else if assertions.NotFound {
+			assert.Empty(list.Items)
 		}
 	} else {
-		assert.Nil(t, err)
+		assert.Nil(err)
 	}
 	return nil
 }
@@ -99,13 +118,12 @@ func (s *Spec) doList(
 func (s *Spec) doGet(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
-	kind string,
+	c *connection,
+	res schema.GroupVersionResource,
 	name string,
 	namespace string,
 ) error {
-	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	_, err := c.Resource(res).Namespace(namespace).Get(
+	_, err := c.client.Resource(res).Namespace(namespace).Get(
 		ctx,
 		name,
 		metav1.GetOptions{},
@@ -140,8 +158,11 @@ func splitKindName(subject string) (string, string) {
 func (s *Spec) runCreate(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
+	c *connection,
 ) error {
+	assert := assert.New(t)
+	assertions := s.Kube.Assert
+
 	var err error
 	var r io.Reader
 	if probablyFilePath(s.Kube.Create) {
@@ -160,39 +181,43 @@ func (s *Spec) runCreate(
 		// unstructured.Unstructured that we then pass to Create()
 		r = strings.NewReader(s.Kube.Create)
 	}
+
 	objs, err := unstructuredFromReader(r)
 	if err != nil {
 		return err
 	}
 	for _, obj := range objs {
-		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		gvk := obj.GetObjectKind().GroupVersionKind()
 		ns := obj.GetNamespace()
 		if ns == "" {
 			ns = s.Namespace()
 		}
-		res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-		_, err := c.Resource(res).Namespace(ns).Create(
-			ctx,
-			obj,
-			metav1.CreateOptions{},
-		)
-		// TODO(jaypipe): Clearly this is applying the same assertion to each
-		// object that was created, which is wrong. When I add the polymorphism
-		// to the Assertions struct, I will modify this block to look for an
-		// indexed set of error assertions.
-		assertions := s.Kube.Assert
+		res, err := c.gvrFromGVK(gvk)
 		if assertions != nil {
 			if assertions.Error != "" {
 				assertError(t, assertions.Error, err)
 			}
-			if (assertions.Len != nil && *assertions.Len == 0) ||
-				assertions.NotFound {
-				apierr, ok := err.(*apierrors.StatusError)
-				require.True(t, ok)
-				assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
+			if assertions.Unknown {
+				assert.ErrorIs(err, ErrRuntimeResourceUnknown)
 			}
 		} else {
-			assert.Nil(t, err)
+			assert.Nil(err)
+		}
+		_, err = c.client.Resource(res).Namespace(ns).Create(
+			ctx,
+			obj,
+			metav1.CreateOptions{},
+		)
+		// TODO(jaypipes): Clearly this is applying the same assertion to each
+		// object that was created, which is wrong. When I add the polymorphism
+		// to the Assertions struct, I will modify this block to look for an
+		// indexed set of error assertions.
+		if assertions != nil {
+			if assertions.Error != "" {
+				assertError(t, assertions.Error, err)
+			}
+		} else {
+			assert.Nil(err, "%s", err)
 		}
 	}
 	return nil
@@ -233,8 +258,11 @@ func unstructuredFromReader(
 func (s *Spec) runDelete(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
+	c *connection,
 ) error {
+	assert := assert.New(t)
+	assertions := s.Kube.Assert
+
 	if probablyFilePath(s.Kube.Delete) {
 		path := s.Kube.Delete
 		f, err := os.Open(path)
@@ -250,23 +278,51 @@ func (s *Spec) runDelete(
 			return err
 		}
 		for _, obj := range objs {
-			kind := obj.GetObjectKind().GroupVersionKind().Kind
+			gvk := obj.GetObjectKind().GroupVersionKind()
+			res, err := c.gvrFromGVK(gvk)
+			if assertions != nil {
+				if assertions.Error != "" {
+					assertError(t, assertions.Error, err)
+				}
+				if assertions.Unknown {
+					assert.ErrorIs(err, ErrRuntimeResourceUnknown)
+				}
+			} else {
+				assert.Nil(err)
+			}
 			name := obj.GetName()
 			ns := obj.GetNamespace()
 			if ns == "" {
 				ns = s.Namespace()
 			}
-			if err := s.doDelete(ctx, t, c, kind, name, ns); err != nil {
+			if err := s.doDelete(ctx, t, c, res, name, ns); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
+
 	kind, name := splitKindName(s.Kube.Delete)
-	if name == "" {
-		return s.doDeleteCollection(ctx, t, c, kind)
+	gvk := schema.GroupVersionKind{
+		Group:   "",
+		Version: "v1",
+		Kind:    kind,
 	}
-	return s.doDelete(ctx, t, c, kind, name, s.Namespace())
+	res, err := c.gvrFromGVK(gvk)
+	if assertions != nil {
+		if assertions.Error != "" {
+			assertError(t, assertions.Error, err)
+		}
+		if assertions.Unknown {
+			assert.ErrorIs(err, ErrRuntimeResourceUnknown)
+		}
+	} else {
+		assert.Nil(err)
+	}
+	if name == "" {
+		return s.doDeleteCollection(ctx, t, c, res, s.Namespace())
+	}
+	return s.doDelete(ctx, t, c, res, name, s.Namespace())
 }
 
 // doDelete performs the Delete() call and assertion check for a supplied
@@ -274,13 +330,15 @@ func (s *Spec) runDelete(
 func (s *Spec) doDelete(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
-	kind string,
+	c *connection,
+	res schema.GroupVersionResource,
 	name string,
 	namespace string,
 ) error {
-	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	err := c.Resource(res).Namespace(namespace).Delete(
+	assert := assert.New(t)
+	require := require.New(t)
+
+	err := c.client.Resource(res).Namespace(namespace).Delete(
 		ctx,
 		name,
 		metav1.DeleteOptions{},
@@ -293,11 +351,11 @@ func (s *Spec) doDelete(
 		if (assertions.Len != nil && *assertions.Len == 0) ||
 			assertions.NotFound {
 			apierr, ok := err.(*apierrors.StatusError)
-			require.True(t, ok)
-			assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
+			require.True(ok)
+			assert.Equal(http.StatusNotFound, int(apierr.ErrStatus.Code))
 		}
 	} else {
-		assert.Nil(t, err)
+		assert.Nil(err)
 	}
 	return nil
 }
@@ -307,12 +365,14 @@ func (s *Spec) doDelete(
 func (s *Spec) doDeleteCollection(
 	ctx context.Context,
 	t *testing.T,
-	c *dynamic.DynamicClient,
-	kind string,
+	c *connection,
+	res schema.GroupVersionResource,
+	namespace string,
 ) error {
-	ns := s.Namespace()
-	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	err := c.Resource(res).Namespace(ns).DeleteCollection(
+	assert := assert.New(t)
+	require := require.New(t)
+
+	err := c.client.Resource(res).Namespace(namespace).DeleteCollection(
 		ctx,
 		metav1.DeleteOptions{},
 		metav1.ListOptions{},
@@ -325,11 +385,11 @@ func (s *Spec) doDeleteCollection(
 		if (assertions.Len != nil && *assertions.Len == 0) ||
 			assertions.NotFound {
 			apierr, ok := err.(*apierrors.StatusError)
-			require.True(t, ok)
-			assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
+			require.True(ok)
+			assert.Equal(http.StatusNotFound, int(apierr.ErrStatus.Code))
 		}
 	} else {
-		assert.Nil(t, err)
+		assert.Nil(err)
 	}
 	return nil
 }

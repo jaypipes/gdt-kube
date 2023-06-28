@@ -26,11 +26,16 @@ type Assertions struct {
 	// the response when the Get request was translated into a List operation
 	// (i.e. when the resource specified was a plural kind
 	Len *int `yaml:"len,omitempty"`
-	// NotFound is a bool indicating the the result of a call should be a
+	// NotFound is a bool indicating the result of a call should be a
 	// NotFound error. Alternately, the user can set `assert.len = 0` and for
 	// single-object-returning calls (e.g. `get` or `delete`) the assertion is
 	// equivalent to `assert.notfound = true`
 	NotFound bool `yaml:"notfound,omitempty"`
+	// Unknown is a bool indicating the test author expects that they will have
+	// gotten an error ("the server could not find the requested resource")
+	// from the Kubernetes API server. This is mostly good for unit/fuzz
+	// testing CRDs.
+	Unknown bool `yaml:"unknown,omitempty"`
 }
 
 func assertError(t *testing.T, exp string, got error) {

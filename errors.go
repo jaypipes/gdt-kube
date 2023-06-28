@@ -63,6 +63,14 @@ var (
 		"%w: manifest not found",
 		gdterrors.ErrRuntime,
 	)
+	// ErrRuntimeResourceUnknown is returned when an unknown resource kind is
+	// specified for a create/apply/delete target. This is a runtime error
+	// because we rely on the discovery client to determine whether a resource
+	// kind is valid.
+	ErrRuntimeResourceUnknown = fmt.Errorf(
+		"%w: resource unknown",
+		gdterrors.ErrRuntime,
+	)
 )
 
 // KubeConfigNotFound returns ErrInvalidKubeConfigNotFound for a given filepath
@@ -85,4 +93,9 @@ func InvalidResourceSpecifierOrFilepath(subject string) error {
 // ManifestNotFound returns ErrRuntimeManifestNotFound for a given file path
 func ManifestNotFound(path string) error {
 	return fmt.Errorf("%w: %s", ErrRuntimeManifestNotFound, path)
+}
+
+// ResourceUnknown returns ErrRuntimeResourceUnknown for a given kind
+func ResourceUnknown(kind string) error {
+	return fmt.Errorf("%w: %s", ErrRuntimeResourceUnknown, kind)
 }
