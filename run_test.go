@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	gdtcontext "github.com/jaypipes/gdt-core/context"
+	"github.com/jaypipes/gdt-core/errors"
 	"github.com/jaypipes/gdt-core/scenario"
 	gdtkube "github.com/jaypipes/gdt-kube"
 	kindfix "github.com/jaypipes/gdt-kube/fixtures/kind"
@@ -63,14 +64,13 @@ func TestUnknownKubeContextInDefaults(t *testing.T) {
 	require.NotNil(s)
 
 	err = s.Run(ctx, t)
-	assert.NotNil(err)
+	require.NotNil(err)
 	assert.ErrorContains(err, "context \"unknownctx\" does not exist")
 }
 
 func TestListPodsEmpty(t *testing.T) {
 	skipIfNoDocker(t)
 	require := require.New(t)
-	assert := assert.New(t)
 
 	fp := filepath.Join("testdata", "list-pods-empty.yaml")
 	f, err := os.Open(fp)
@@ -91,13 +91,12 @@ func TestListPodsEmpty(t *testing.T) {
 	require.NotNil(s)
 
 	err = s.Run(ctx, t)
-	assert.Nil(err)
+	require.Nil(err)
 }
 
 func TestGetPodNotFound(t *testing.T) {
 	skipIfNoDocker(t)
 	require := require.New(t)
-	assert := assert.New(t)
 
 	fp := filepath.Join("testdata", "get-pod-not-found.yaml")
 	f, err := os.Open(fp)
@@ -118,7 +117,63 @@ func TestGetPodNotFound(t *testing.T) {
 	require.NotNil(s)
 
 	err = s.Run(ctx, t)
-	assert.Nil(err)
+	require.Nil(err)
+}
+
+func TestCreateFileNotFound(t *testing.T) {
+	skipIfNoDocker(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	fp := filepath.Join("testdata", "create-file-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.NotNil(err)
+	require.IsType(err, &errors.RuntimeErrors{})
+	re := err.(*errors.RuntimeErrors)
+	assert.True(re.Has(gdtkube.ErrRuntimeManifestNotFound))
+}
+
+func TestCreateUnknownResource(t *testing.T) {
+	skipIfNoDocker(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "create-unknown-resource.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.Nil(err)
 }
 
 func skipIfNoDocker(t *testing.T) {

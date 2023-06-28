@@ -48,6 +48,14 @@ var (
 		"%w: invalid resource specifier",
 		gdterrors.ErrInvalid,
 	)
+	// ErrRuntimeManifestNotFound is returned when a file path does not exist
+	// for a create/apply/delete target. This is a runtime error because we do
+	// not check for target file path existence during parsing in order to lazy
+	// evaluate environment variables and other things.
+	ErrRuntimeManifestNotFound = fmt.Errorf(
+		"%w: manifest not found",
+		gdterrors.ErrRuntime,
+	)
 )
 
 // KubeConfigNotFound returns ErrInvalidKubeConfigNotFound for a given filepath
@@ -59,4 +67,9 @@ func KubeConfigNotFound(path string) error {
 // supplied resource specifier.
 func InvalidResourceSpecifier(subject string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifier, subject)
+}
+
+// ManifestNotFound returns ErrRuntimeManifestNotFound for a given file path
+func ManifestNotFound(path string) error {
+	return fmt.Errorf("%w: %s", ErrRuntimeManifestNotFound, path)
 }

@@ -139,8 +139,8 @@ github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NH
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
 github.com/jaypipes/gdt v1.7.0 h1:v0/sMB/y51e6X8oEo/vldxYHpi/Qu1TTbCkklz4rojk=
 github.com/jaypipes/gdt v1.7.0/go.mod h1:b+mhqXrpanOPcJ0PNSsMP+GIdfR7gaS8pJy1RaRZYtg=
-github.com/jaypipes/gdt-core v1.7.0 h1:xTdeF0hqzOVcraVJ5uc5BCI4GgIx7b/AlTEjRXpzA5E=
-github.com/jaypipes/gdt-core v1.7.0/go.mod h1:2wsyVs5ty1XfowxCnezoGOsovEpFrXQehLCcD0E4+gg=
+github.com/jaypipes/gdt-core v1.7.1 h1:XdxsKA/pJj0tUKPhiSxS3PH42UuCL1TYx64j6rp1Pyc=
+github.com/jaypipes/gdt-core v1.7.1/go.mod h1:2wsyVs5ty1XfowxCnezoGOsovEpFrXQehLCcD0E4+gg=
 github.com/jaypipes/gdt-http v1.7.0 h1:bAES7uxHB8EepjkiMXViDs5C4jew4ZQ+MdKlaumGmyk=
 github.com/jaypipes/gdt-http v1.7.0/go.mod h1:FXYscTsYeFqQnjLH9Pqj7T9k+IKruJAT2fA18A53+G8=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=

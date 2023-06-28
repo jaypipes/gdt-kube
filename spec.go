@@ -135,10 +135,13 @@ func (s *Spec) Title() string {
 	return ""
 }
 
-// poor man's quick-check of whether the action string is a file path or a YAML
-// string...
+// probablyFilePath returns true if the supplied string looks to be a file
+// path, false otherwise
 func probablyFilePath(subject string) bool {
-	return strings.ContainsRune(subject, '\n') || strings.ContainsRune(subject, '\r')
+	if strings.ContainsAny(subject, " :\n\r\t") {
+		return false
+	}
+	return strings.ContainsRune(subject, '.')
 }
 
 func (s *Spec) SetBase(b gdttypes.Spec) {
