@@ -176,6 +176,88 @@ func TestCreateUnknownResource(t *testing.T) {
 	require.Nil(err)
 }
 
+func TestDeleteFileNotFound(t *testing.T) {
+	skipIfNoDocker(t)
+	require := require.New(t)
+	assert := assert.New(t)
+
+	fp := filepath.Join("testdata", "delete-file-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.NotNil(err)
+	require.IsType(err, &errors.RuntimeErrors{})
+	re := err.(*errors.RuntimeErrors)
+	assert.True(re.Has(gdtkube.ErrRuntimeManifestNotFound))
+}
+
+func TestDeleteResourceNotFound(t *testing.T) {
+	skipIfNoDocker(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "delete-resource-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.Nil(err)
+}
+
+func TestDeleteUnknownResource(t *testing.T) {
+	skipIfNoDocker(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "delete-unknown-resource.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.Nil(err)
+}
+
 func skipIfNoDocker(t *testing.T) {
 	_, err := exec.LookPath("docker")
 	if err != nil || runtime.GOOS == "windows" {

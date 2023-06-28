@@ -50,7 +50,7 @@ func (s *Spec) UnmarshalYAML(node *yaml.Node) error {
 			if valNode.Kind != yaml.ScalarNode {
 				return errors.ExpectedScalarAt(valNode)
 			}
-			s.KubeDelete = strings.TrimSpace(valNode.Value)
+			s.KubeDelete = valNode.Value
 		default:
 			if lo.Contains(gdttypes.BaseSpecFields, key) {
 				continue
@@ -135,7 +135,8 @@ func moreThanOneAction(s *Spec) bool {
 }
 
 // validateKubeSpec ensures that the test author has specified only a single
-// action in the KubeSpec.
+// action in the KubeSpec and that various KubeSpec fields are set
+// appropriately.
 func validateKubeSpec(s *Spec) error {
 	if moreThanOneAction(s) {
 		return ErrInvalidMoreThanOneKubeAction
@@ -146,19 +147,36 @@ func validateKubeSpec(s *Spec) error {
 		}
 	}
 	if s.Kube.Delete != "" {
-		if err := validateResourceIdentifier(s.Kube.Delete); err != nil {
+		if err := validateResourceIdentifierOrFilepath(s.Kube.Delete); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// validateResurceIdentifier returns an error if the supplied `Get` or `Delete`
-// argument contains an ill-formed Kind, Alias or Kind/Name specifier. Only a
-// single Kind may be specified (i.e. no commas or spaces are allowed in the
-// supplied string.)
+// validateResourceIdentifierOrFilepath returns an error if the supplied
+// argument is not a filepath and contains an ill-formed Kind, Alias or
+// Kind/Name specifier. Only a single Kind may be specified (i.e. no commas or
+// spaces are allowed in the supplied string.)
+func validateResourceIdentifierOrFilepath(subject string) error {
+	if probablyFilePath(subject) {
+		return nil
+	}
+	if strings.ContainsAny(subject, " ,;\n\t\r") {
+		return InvalidResourceSpecifierOrFilepath(subject)
+	}
+	if strings.Count(subject, "/") > 1 {
+		return InvalidResourceSpecifierOrFilepath(subject)
+	}
+	return nil
+}
+
+// validateResourceIdentifier returns an error if the supplied argument
+// contains an ill-formed Kind, Alias or Kind/Name specifier. Only a single
+// Kind may be specified (i.e. no commas or spaces are allowed in the supplied
+// string.)
 func validateResourceIdentifier(subject string) error {
-	if strings.ContainsAny(subject, " ,;") {
+	if strings.ContainsAny(subject, " ,;\n\t\r") {
 		return InvalidResourceSpecifier(subject)
 	}
 	if strings.Count(subject, "/") > 1 {

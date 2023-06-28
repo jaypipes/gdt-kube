@@ -177,6 +177,28 @@ func TestFailureInvalidResourceSpecifierMutipleForwardSlashes(t *testing.T) {
 	assert.Nil(s)
 }
 
+func TestFailureInvalidDeleteNotFilepathOrResourceSpecifier(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "failures", "invalid-delete-not-filepath-or-resource-specifier.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	assert.NotNil(err)
+	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifierOrFilepath)
+	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.Nil(s)
+}
+
 func TestParse(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)

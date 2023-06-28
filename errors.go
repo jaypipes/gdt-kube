@@ -48,6 +48,13 @@ var (
 		"%w: invalid resource specifier",
 		gdterrors.ErrInvalid,
 	)
+	// ErrInvalidResourceSpecifierOrFilepath is returned when the test author
+	// uses a resource specifier for the `kube.delete` fields that is not valid
+	// or is not a filepath.
+	ErrInvalidResourceSpecifierOrFilepath = fmt.Errorf(
+		"%w: invalid resource specifier or filepath",
+		gdterrors.ErrInvalid,
+	)
 	// ErrRuntimeManifestNotFound is returned when a file path does not exist
 	// for a create/apply/delete target. This is a runtime error because we do
 	// not check for target file path existence during parsing in order to lazy
@@ -67,6 +74,12 @@ func KubeConfigNotFound(path string) error {
 // supplied resource specifier.
 func InvalidResourceSpecifier(subject string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifier, subject)
+}
+
+// InvalidResourceSpecifierOrFilepath returns
+// ErrInvalidResourceSpecifierOrFilepath for a given supplied subject.
+func InvalidResourceSpecifierOrFilepath(subject string) error {
+	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifierOrFilepath, subject)
 }
 
 // ManifestNotFound returns ErrRuntimeManifestNotFound for a given file path

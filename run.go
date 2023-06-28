@@ -41,6 +41,9 @@ func (s *Spec) Run(ctx context.Context, t *testing.T) error {
 		if s.Kube.Create != "" {
 			err = s.runCreate(ctx, t, c)
 		}
+		if s.Kube.Delete != "" {
+			err = s.runDelete(ctx, t, c)
+		}
 	})
 	return result.New(
 		result.WithError(err),
@@ -57,9 +60,9 @@ func (s *Spec) runGet(
 ) error {
 	kind, name := splitKindName(s.Kube.Get)
 	if name == "" {
-		return s.doList(ctx, t, c, kind)
+		return s.doList(ctx, t, c, kind, s.Namespace())
 	}
-	return s.doGet(ctx, t, c, kind, name)
+	return s.doGet(ctx, t, c, kind, name, s.Namespace())
 }
 
 // doList performs the List() call and assertion check for a supplied resource
@@ -69,10 +72,10 @@ func (s *Spec) doList(
 	t *testing.T,
 	c *dynamic.DynamicClient,
 	kind string,
+	namespace string,
 ) error {
-	ns := s.Namespace()
 	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	list, err := c.Resource(res).Namespace(ns).List(
+	list, err := c.Resource(res).Namespace(namespace).List(
 		ctx,
 		metav1.ListOptions{},
 	)
@@ -99,10 +102,10 @@ func (s *Spec) doGet(
 	c *dynamic.DynamicClient,
 	kind string,
 	name string,
+	namespace string,
 ) error {
-	ns := s.Namespace()
 	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
-	_, err := c.Resource(res).Namespace(ns).Get(
+	_, err := c.Resource(res).Namespace(namespace).Get(
 		ctx,
 		name,
 		metav1.GetOptions{},
@@ -161,9 +164,12 @@ func (s *Spec) runCreate(
 	if err != nil {
 		return err
 	}
-	ns := s.Namespace()
 	for _, obj := range objs {
 		kind := obj.GetObjectKind().GroupVersionKind().Kind
+		ns := obj.GetNamespace()
+		if ns == "" {
+			ns = s.Namespace()
+		}
 		res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
 		_, err := c.Resource(res).Namespace(ns).Create(
 			ctx,
@@ -220,4 +226,110 @@ func unstructuredFromReader(
 	}
 
 	return objs, nil
+}
+
+// runDelete executes either Delete() call against the Kubernetes API server
+// and evaluates any assertions that have been set for the returned results.
+func (s *Spec) runDelete(
+	ctx context.Context,
+	t *testing.T,
+	c *dynamic.DynamicClient,
+) error {
+	if probablyFilePath(s.Kube.Delete) {
+		path := s.Kube.Delete
+		f, err := os.Open(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return ManifestNotFound(path)
+			}
+			return err
+		}
+		defer f.Close()
+		objs, err := unstructuredFromReader(f)
+		if err != nil {
+			return err
+		}
+		for _, obj := range objs {
+			kind := obj.GetObjectKind().GroupVersionKind().Kind
+			name := obj.GetName()
+			ns := obj.GetNamespace()
+			if ns == "" {
+				ns = s.Namespace()
+			}
+			if err := s.doDelete(ctx, t, c, kind, name, ns); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	kind, name := splitKindName(s.Kube.Delete)
+	if name == "" {
+		return s.doDeleteCollection(ctx, t, c, kind)
+	}
+	return s.doDelete(ctx, t, c, kind, name, s.Namespace())
+}
+
+// doDelete performs the Delete() call and assertion check for a supplied
+// resource kind and name
+func (s *Spec) doDelete(
+	ctx context.Context,
+	t *testing.T,
+	c *dynamic.DynamicClient,
+	kind string,
+	name string,
+	namespace string,
+) error {
+	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
+	err := c.Resource(res).Namespace(namespace).Delete(
+		ctx,
+		name,
+		metav1.DeleteOptions{},
+	)
+	assertions := s.Kube.Assert
+	if assertions != nil {
+		if assertions.Error != "" {
+			assertError(t, assertions.Error, err)
+		}
+		if (assertions.Len != nil && *assertions.Len == 0) ||
+			assertions.NotFound {
+			apierr, ok := err.(*apierrors.StatusError)
+			require.True(t, ok)
+			assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
+		}
+	} else {
+		assert.Nil(t, err)
+	}
+	return nil
+}
+
+// doDeleteCollection performs the DeleteCollection() call and assertion check
+// for a supplied resource kind
+func (s *Spec) doDeleteCollection(
+	ctx context.Context,
+	t *testing.T,
+	c *dynamic.DynamicClient,
+	kind string,
+) error {
+	ns := s.Namespace()
+	res := schema.GroupVersionResource{Group: "", Version: "v1", Resource: kind}
+	err := c.Resource(res).Namespace(ns).DeleteCollection(
+		ctx,
+		metav1.DeleteOptions{},
+		metav1.ListOptions{},
+	)
+	assertions := s.Kube.Assert
+	if assertions != nil {
+		if assertions.Error != "" {
+			assertError(t, assertions.Error, err)
+		}
+		if (assertions.Len != nil && *assertions.Len == 0) ||
+			assertions.NotFound {
+			apierr, ok := err.(*apierrors.StatusError)
+			require.True(t, ok)
+			assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
+		}
+	} else {
+		assert.Nil(t, err)
+	}
+	return nil
 }
