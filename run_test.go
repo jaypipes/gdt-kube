@@ -6,9 +6,7 @@ package kube_test
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	gdtcontext "github.com/jaypipes/gdt-core/context"
@@ -284,9 +282,9 @@ func TestPodCreateGetDelete(t *testing.T) {
 	require.Nil(err, "%s", err)
 }
 
-func skipIfNoDocker(t *testing.T) {
-	_, err := exec.LookPath("docker")
-	if err != nil || runtime.GOOS == "windows" {
-		t.Skipf("no docker available in order to run KinD or Windows docker is hobbled")
+func skipIfKind(t *testing.T) {
+	_, found := os.LookupEnv("SKIP_KIND")
+	if found {
+		t.Skipf("skipping KinD-requiring test")
 	}
 }
