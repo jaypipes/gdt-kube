@@ -1,6 +1,13 @@
 on: [push, pull_request]
 name: gate tests
 jobs:
+  create-kind-cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - name: create KinD cluster
+        uses: helm/kind-action@v1.7.0
+        with:
+          cluster_name: kind
   test:
     strategy:
       matrix:
