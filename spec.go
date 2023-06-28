@@ -20,6 +20,18 @@ import (
 // actions and assertions. Most users will use the `kube.create`, `kube.apply`
 // and `kube.describe` shortcut fields.
 type KubeSpec struct {
+	// Config is the path of the kubeconfig to use in executing Kubernetes
+	// client calls for this Spec. If empty, the `kube` defaults' `config`
+	// value will be used. If that is empty, the following precedence is used:
+	//
+	// 1) KUBECONFIG environment variable pointing at a file.
+	// 2) In-cluster config if running in cluster.
+	// 3) $HOME/.kube/config if exists.
+	Config string `yaml:"config,omitempty"`
+	// Context is the name of the kubecontext to use for this Spec. If empty,
+	// the `kube` defaults' `context` value will be used. If that is empty, the
+	// kubecontext marked default in the kubeconfig is used.
+	Context string `yaml:"context,omitempty"`
 	// Namespace is a string indicating the Kubernetes namespace to use when
 	// calling the Kubernetes API. If empty, any namespace specified in the
 	// Defaults is used and then the string "default" is used.
@@ -55,18 +67,6 @@ type KubeSpec struct {
 	//   * a space followed by `-l ` followed by a label to get resources
 	//     having such a label.
 	Get string `yaml:"get,omitempty"`
-	// Config is the path of the kubeconfig to use in executing Kubernetes
-	// client calls for this Spec. If empty, the `kube` defaults' `config`
-	// value will be used. If that is empty, the following precedence is used:
-	//
-	// 1) KUBECONFIG environment variable pointing at a file.
-	// 2) In-cluster config if running in cluster.
-	// 3) $HOME/.kube/config if exists.
-	Config string `yaml:"config,omitempty"`
-	// Context is the name of the kubecontext to use for this Spec. If empty,
-	// the `kube` defaults' `context` value will be used. If that is empty, the
-	// kubecontext marked default in the kubeconfig is used.
-	Context string `yaml:"context,omitempty"`
 	// Assert houses the various assertions to be made about the kube client
 	// call (Create, Apply, Get, etc)
 	Assert *Assertions `yaml:"assert,omitempty"`
