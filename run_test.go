@@ -67,7 +67,7 @@ func TestUnknownKubeContextInDefaults(t *testing.T) {
 }
 
 func TestListPodsEmpty(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "list-pods-empty.yaml")
@@ -93,7 +93,7 @@ func TestListPodsEmpty(t *testing.T) {
 }
 
 func TestGetPodNotFound(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "get-pod-not-found.yaml")
@@ -119,7 +119,7 @@ func TestGetPodNotFound(t *testing.T) {
 }
 
 func TestCreateFileNotFound(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -149,7 +149,7 @@ func TestCreateFileNotFound(t *testing.T) {
 }
 
 func TestCreateUnknownResource(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "create-unknown-resource.yaml")
@@ -175,7 +175,7 @@ func TestCreateUnknownResource(t *testing.T) {
 }
 
 func TestDeleteFileNotFound(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 	assert := assert.New(t)
 
@@ -205,7 +205,7 @@ func TestDeleteFileNotFound(t *testing.T) {
 }
 
 func TestDeleteResourceNotFound(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "delete-resource-not-found.yaml")
@@ -231,7 +231,7 @@ func TestDeleteResourceNotFound(t *testing.T) {
 }
 
 func TestDeleteUnknownResource(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "delete-unknown-resource.yaml")
@@ -257,7 +257,7 @@ func TestDeleteUnknownResource(t *testing.T) {
 }
 
 func TestPodCreateGetDelete(t *testing.T) {
-	skipIfNoDocker(t)
+	skipIfKind(t)
 	require := require.New(t)
 
 	fp := filepath.Join("testdata", "create-get-delete-pod.yaml")
