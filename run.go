@@ -9,15 +9,12 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/jaypipes/gdt-core/result"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -27,19 +24,32 @@ import (
 // Run executes the test described by the Kubernetes test. A new Kubernetes
 // client request is made during this call.
 func (s *Spec) Run(ctx context.Context, t *testing.T) error {
+	var ok bool
 	c, err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 	t.Run(s.Title(), func(t *testing.T) {
 		if s.Kube.Get != "" {
-			err = s.runGet(ctx, t, c)
+			err, ok = s.runGet(ctx, t, c)
+			assert.True(t, ok, err)
+			if !ok {
+				// TODO(jaypipes): retry until the timeout
+			}
 		}
 		if s.Kube.Create != "" {
-			err = s.runCreate(ctx, t, c)
+			err, ok = s.runCreate(ctx, t, c)
+			assert.True(t, ok, err)
+			if !ok {
+				// TODO(jaypipes): retry until the timeout
+			}
 		}
 		if s.Kube.Delete != "" {
-			err = s.runDelete(ctx, t, c)
+			err, ok = s.runDelete(ctx, t, c)
+			assert.True(t, ok, err)
+			if !ok {
+				// TODO(jaypipes): retry until the timeout
+			}
 		}
 	})
 	return result.New(
@@ -54,8 +64,7 @@ func (s *Spec) runGet(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) error {
-	assert := assert.New(t)
+) (error, bool) {
 	assertions := s.Kube.Assert
 
 	kind, name := splitKindName(s.Kube.Get)
@@ -63,18 +72,9 @@ func (s *Spec) runGet(
 		Kind: kind,
 	}
 	res, err := c.gvrFromGVK(gvk)
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if assertions.Unknown {
-			assert.ErrorIs(err, ErrRuntimeResourceUnknown)
-		}
-	} else {
-		assert.Nil(err)
-	}
-	if err != nil {
-		return nil
+	err, ok := assertions.OK(err, nil)
+	if !ok {
+		return err, false
 	}
 	if name == "" {
 		return s.doList(ctx, t, c, res, s.Namespace())
@@ -90,27 +90,13 @@ func (s *Spec) doList(
 	c *connection,
 	res schema.GroupVersionResource,
 	namespace string,
-) error {
-	assert := assert.New(t)
+) (error, bool) {
 	assertions := s.Kube.Assert
 	list, err := c.client.Resource(res).Namespace(namespace).List(
 		ctx,
 		metav1.ListOptions{},
 	)
-	require.Nil(t, err)
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if assertions.Len != nil {
-			assertLen(t, *assertions.Len, len(list.Items))
-		} else if assertions.NotFound {
-			assert.Empty(list.Items)
-		}
-	} else {
-		assert.Nil(err)
-	}
-	return nil
+	return assertions.OK(err, list)
 }
 
 // doGet performs the Get() call and assertion check for a supplied resource
@@ -122,27 +108,14 @@ func (s *Spec) doGet(
 	res schema.GroupVersionResource,
 	name string,
 	namespace string,
-) error {
+) (error, bool) {
+	assertions := s.Kube.Assert
 	_, err := c.client.Resource(res).Namespace(namespace).Get(
 		ctx,
 		name,
 		metav1.GetOptions{},
 	)
-	assertions := s.Kube.Assert
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if (assertions.Len != nil && *assertions.Len == 0) ||
-			assertions.NotFound {
-			apierr, ok := err.(*apierrors.StatusError)
-			require.True(t, ok)
-			assert.Equal(t, http.StatusNotFound, int(apierr.ErrStatus.Code))
-		}
-	} else {
-		assert.Nil(t, err)
-	}
-	return nil
+	return assertions.OK(err, nil)
 }
 
 // splitKindName returns the Kind for a supplied `Get` or `Delete` command
@@ -159,8 +132,7 @@ func (s *Spec) runCreate(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) error {
-	assert := assert.New(t)
+) (error, bool) {
 	assertions := s.Kube.Assert
 
 	var err error
@@ -170,9 +142,9 @@ func (s *Spec) runCreate(
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return ManifestNotFound(path)
+				return ManifestNotFound(path), true
 			}
-			return err
+			return err, true
 		}
 		defer f.Close()
 		r = f
@@ -184,7 +156,7 @@ func (s *Spec) runCreate(
 
 	objs, err := unstructuredFromReader(r)
 	if err != nil {
-		return err
+		return err, true
 	}
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
@@ -193,17 +165,11 @@ func (s *Spec) runCreate(
 			ns = s.Namespace()
 		}
 		res, err := c.gvrFromGVK(gvk)
-		if assertions != nil {
-			if assertions.Error != "" {
-				assertError(t, assertions.Error, err)
-			}
-			if assertions.Unknown {
-				assert.ErrorIs(err, ErrRuntimeResourceUnknown)
-			}
-		} else {
-			assert.Nil(err)
+		err, ok := assertions.OK(err, nil)
+		if !ok {
+			return err, false
 		}
-		_, err = c.client.Resource(res).Namespace(ns).Create(
+		resp, err := c.client.Resource(res).Namespace(ns).Create(
 			ctx,
 			obj,
 			metav1.CreateOptions{},
@@ -212,15 +178,12 @@ func (s *Spec) runCreate(
 		// object that was created, which is wrong. When I add the polymorphism
 		// to the Assertions struct, I will modify this block to look for an
 		// indexed set of error assertions.
-		if assertions != nil {
-			if assertions.Error != "" {
-				assertError(t, assertions.Error, err)
-			}
-		} else {
-			assert.Nil(err, "%s", err)
+		err, ok = assertions.OK(err, resp)
+		if !ok {
+			return err, false
 		}
 	}
-	return nil
+	return nil, true
 }
 
 // unstructuredFromReader attempts to read the supplied io.Reader and unmarshal
@@ -259,8 +222,7 @@ func (s *Spec) runDelete(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) error {
-	assert := assert.New(t)
+) (error, bool) {
 	assertions := s.Kube.Assert
 
 	if probablyFilePath(s.Kube.Delete) {
@@ -268,38 +230,36 @@ func (s *Spec) runDelete(
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return ManifestNotFound(path)
+				return ManifestNotFound(path), true
 			}
-			return err
+			return err, true
 		}
 		defer f.Close()
 		objs, err := unstructuredFromReader(f)
 		if err != nil {
-			return err
+			return err, true
 		}
 		for _, obj := range objs {
 			gvk := obj.GetObjectKind().GroupVersionKind()
 			res, err := c.gvrFromGVK(gvk)
-			if assertions != nil {
-				if assertions.Error != "" {
-					assertError(t, assertions.Error, err)
-				}
-				if assertions.Unknown {
-					assert.ErrorIs(err, ErrRuntimeResourceUnknown)
-				}
-			} else {
-				assert.Nil(err)
+			err, ok := assertions.OK(err, nil)
+			if !ok {
+				return err, false
 			}
 			name := obj.GetName()
 			ns := obj.GetNamespace()
 			if ns == "" {
 				ns = s.Namespace()
 			}
-			if err := s.doDelete(ctx, t, c, res, name, ns); err != nil {
-				return err
+			// TODO(jaypipes): Clearly this is applying the same assertion to each
+			// object that was deleted, which is wrong. When I add the polymorphism
+			// to the Assertions struct, I will modify this block to look for an
+			// indexed set of error assertions.
+			if err, ok = s.doDelete(ctx, t, c, res, name, ns); !ok {
+				return err, false
 			}
 		}
-		return nil
+		return nil, true
 	}
 
 	kind, name := splitKindName(s.Kube.Delete)
@@ -309,15 +269,9 @@ func (s *Spec) runDelete(
 		Kind:    kind,
 	}
 	res, err := c.gvrFromGVK(gvk)
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if assertions.Unknown {
-			assert.ErrorIs(err, ErrRuntimeResourceUnknown)
-		}
-	} else {
-		assert.Nil(err)
+	err, ok := assertions.OK(err, nil)
+	if !ok {
+		return err, false
 	}
 	if name == "" {
 		return s.doDeleteCollection(ctx, t, c, res, s.Namespace())
@@ -334,30 +288,14 @@ func (s *Spec) doDelete(
 	res schema.GroupVersionResource,
 	name string,
 	namespace string,
-) error {
-	assert := assert.New(t)
-	require := require.New(t)
-
+) (error, bool) {
+	assertions := s.Kube.Assert
 	err := c.client.Resource(res).Namespace(namespace).Delete(
 		ctx,
 		name,
 		metav1.DeleteOptions{},
 	)
-	assertions := s.Kube.Assert
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if (assertions.Len != nil && *assertions.Len == 0) ||
-			assertions.NotFound {
-			apierr, ok := err.(*apierrors.StatusError)
-			require.True(ok)
-			assert.Equal(http.StatusNotFound, int(apierr.ErrStatus.Code))
-		}
-	} else {
-		assert.Nil(err)
-	}
-	return nil
+	return assertions.OK(err, nil)
 }
 
 // doDeleteCollection performs the DeleteCollection() call and assertion check
@@ -368,28 +306,12 @@ func (s *Spec) doDeleteCollection(
 	c *connection,
 	res schema.GroupVersionResource,
 	namespace string,
-) error {
-	assert := assert.New(t)
-	require := require.New(t)
-
+) (error, bool) {
+	assertions := s.Kube.Assert
 	err := c.client.Resource(res).Namespace(namespace).DeleteCollection(
 		ctx,
 		metav1.DeleteOptions{},
 		metav1.ListOptions{},
 	)
-	assertions := s.Kube.Assert
-	if assertions != nil {
-		if assertions.Error != "" {
-			assertError(t, assertions.Error, err)
-		}
-		if (assertions.Len != nil && *assertions.Len == 0) ||
-			assertions.NotFound {
-			apierr, ok := err.(*apierrors.StatusError)
-			require.True(ok)
-			assert.Equal(http.StatusNotFound, int(apierr.ErrStatus.Code))
-		}
-	} else {
-		assert.Nil(err)
-	}
-	return nil
+	return assertions.OK(err, nil)
 }

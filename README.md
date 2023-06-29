@@ -15,8 +15,8 @@ calls.
 
 ## Usage
 
-`gdt-kube` is a Golang library and is intended to be included in your own Golang
-application's test code as a Golang package dependency.
+`gdt-kube` is a Go library and is intended to be included in your own Go
+application's test code as a Go package dependency.
 
 Import the `gdt` and `gdt-kube` libraries in a Go test file:
 
