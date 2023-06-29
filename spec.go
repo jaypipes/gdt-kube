@@ -64,6 +64,8 @@ type KubeSpec struct {
 	Get string `yaml:"get,omitempty"`
 	// Assert houses the various assertions to be made about the kube client
 	// call (Create, Apply, Get, etc)
+	// TODO(jaypipes): Make this polymorphic to be either a single assertion
+	// struct or a list of assertion structs
 	Assert *Assertions `yaml:"assert,omitempty"`
 }
 
