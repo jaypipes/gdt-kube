@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jaypipes/gdt"
 	gdtcontext "github.com/jaypipes/gdt-core/context"
 	"github.com/jaypipes/gdt-core/errors"
 	"github.com/jaypipes/gdt-core/scenario"
@@ -170,6 +171,26 @@ func TestCreateUnknownResource(t *testing.T) {
 	require.Nil(err)
 	require.NotNil(s)
 
+	err = s.Run(ctx, t)
+	require.Nil(err)
+}
+
+func TestCreateUnknownResourceUsingGDT(t *testing.T) {
+	// This is testing that the plugin registration for the gdt module (and
+	// thus the lack of need to manually register the kube plugin) is working
+	// properly.
+	skipIfKind(t)
+	require := require.New(t)
+	kfix := kindfix.New()
+
+	fp := filepath.Join("testdata", "create-unknown-resource.yaml")
+
+	s, err := gdt.From(fp)
+	require.Nil(err)
+	require.NotNil(s)
+
+	ctx := gdt.NewContext()
+	ctx = gdt.RegisterFixture(ctx, "kind", kfix)
 	err = s.Run(ctx, t)
 	require.Nil(err)
 }
