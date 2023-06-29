@@ -32,15 +32,14 @@ test object (either a `Scenario` or a `Suite`) that can be `Run()` with a
 standard Go `context.Context` and a standard Go `*testing.T` type:
 
 ```go
-
 func TestExample(t *testing.T) {
-	s, err := gdt.From("path/to/test.yaml")
+    s, err := gdt.From("path/to/test.yaml")
     if err != nil {
         t.Fatalf("failed to load tests: %s", err)
     }
 
-	ctx := context.Background()
-	err = s.Run(ctx, t)
+    ctx := context.Background()
+    err = s.Run(ctx, t)
     if err != nil {
         t.Fatalf("failed to run tests: %s", err)
     }
@@ -262,6 +261,55 @@ following precedence is used to determine the `kubeconfig`:
 6) `$HOME/.kube/config` if it exists.
 
 [kube-fixture]: https://github.com/jaypipes/gdt-kube/blob/main/fixtures/kind/kind.go
+
+## `gdt-kube` Fixtures
+
+`gdt` Fixtures are objects that help set up and tear down a testing
+environment. The `gdt-kube` library has some utility fixtures to make testing
+with Kubernetes easier.
+
+### `KindFixture`
+
+The `KindFixture` eases integration of `gdt-kube` tests with the KinD local
+Kubernetes development system.
+
+To use it, import the `gdt-kube/fixtures/kind` package:
+
+```go
+import (
+    "github.com/jaypipes/gdt"
+    gdtkube "github.com/jaypipes/gdt-kube"
+    gdtkind "github.com/jaypipes/gdt-kube/fixtures/kind"
+)
+```
+
+and then register the fixture with your `gdt` `Context`, like so:
+
+```go
+func TestExample(t *testing.T) {
+    s, err := gdt.From("path/to/test.yaml")
+    if err != nil {
+        t.Fatalf("failed to load tests: %s", err)
+    }
+
+    ctx := context.Background()
+    ctx = gdt.RegisterFixture(ctx, "kind", gdtkind.New())
+    err = s.Run(ctx, t)
+    if err != nil {
+        t.Fatalf("failed to run tests: %s", err)
+    }
+}
+```
+
+In your test file, you would list the "kind" fixture in the `requires` list:
+
+```yaml
+name: example-using-kind
+require:
+ - kind
+tests:
+ - kube.get: pods/nginx
+```
 
 ## Contributing and acknowledgements
 
