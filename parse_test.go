@@ -149,10 +149,10 @@ func TestFailureInvalidResourceSpecifierNoMultipleResources(t *testing.T) {
 		scenario.WithPath(fp),
 		scenario.WithContext(ctx),
 	)
-	assert.NotNil(err)
+	require.NotNil(err)
 	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifier)
 	assert.ErrorIs(err, errors.ErrInvalid)
-	assert.Nil(s)
+	require.Nil(s)
 }
 
 func TestFailureInvalidResourceSpecifierMutipleForwardSlashes(t *testing.T) {
@@ -171,10 +171,10 @@ func TestFailureInvalidResourceSpecifierMutipleForwardSlashes(t *testing.T) {
 		scenario.WithPath(fp),
 		scenario.WithContext(ctx),
 	)
-	assert.NotNil(err)
+	require.NotNil(err)
 	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifier)
 	assert.ErrorIs(err, errors.ErrInvalid)
-	assert.Nil(s)
+	require.Nil(s)
 }
 
 func TestFailureInvalidDeleteNotFilepathOrResourceSpecifier(t *testing.T) {
@@ -193,10 +193,54 @@ func TestFailureInvalidDeleteNotFilepathOrResourceSpecifier(t *testing.T) {
 		scenario.WithPath(fp),
 		scenario.WithContext(ctx),
 	)
-	assert.NotNil(err)
+	require.NotNil(err)
 	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifierOrFilepath)
 	assert.ErrorIs(err, errors.ErrInvalid)
-	assert.Nil(s)
+	require.Nil(s)
+}
+
+func TestFailureCreateFileNotFound(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	fp := filepath.Join("testdata", "failures", "create-file-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.NotNil(err)
+	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
+	assert.ErrorIs(err, errors.ErrInvalid)
+	require.Nil(s)
+}
+
+func TestDeleteFileNotFound(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	fp := filepath.Join("testdata", "failures", "delete-file-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.NotNil(err)
+	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
+	assert.ErrorIs(err, errors.ErrInvalid)
+	require.Nil(s)
 }
 
 func TestParse(t *testing.T) {
@@ -249,9 +293,9 @@ spec:
 				Name:     "apply a pod from a file using kube.apply shortcut",
 				Defaults: &gdttypes.Defaults{},
 			},
-			KubeApply: "testdata/manifests/pod.yaml",
+			KubeApply: "testdata/manifests/nginx-pod.yaml",
 			Kube: &gdtkube.KubeSpec{
-				Apply: "testdata/manifests/pod.yaml",
+				Apply: "testdata/manifests/nginx-pod.yaml",
 			},
 		},
 		&gdtkube.Spec{
@@ -267,11 +311,11 @@ spec:
 		&gdtkube.Spec{
 			Spec: gdttypes.Spec{
 				Index:    3,
-				Name:     "apply a pod from a file",
+				Name:     "delete a pod from a file",
 				Defaults: &gdttypes.Defaults{},
 			},
 			Kube: &gdtkube.KubeSpec{
-				Apply: "testdata/manifests/pod.yaml",
+				Delete: "testdata/manifests/nginx-pod.yaml",
 			},
 		},
 	}

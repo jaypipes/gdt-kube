@@ -5,6 +5,7 @@
 package kube
 
 import (
+	"os"
 	"strings"
 
 	"github.com/jaypipes/gdt-core/errors"
@@ -148,6 +149,34 @@ func validateKubeSpec(s *Spec) error {
 	}
 	if s.Kube.Delete != "" {
 		if err := validateResourceIdentifierOrFilepath(s.Kube.Delete); err != nil {
+			return err
+		}
+		if err := validateFileExists(s.Kube.Delete); err != nil {
+			return err
+		}
+	}
+	if s.Kube.Create != "" {
+		if err := validateFileExists(s.Kube.Create); err != nil {
+			return err
+		}
+	}
+	if s.Kube.Apply != "" {
+		if err := validateFileExists(s.Kube.Apply); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateFileExists returns an error if the supplied path looks like a file
+// path but the file does not exist.
+func validateFileExists(path string) error {
+	if probablyFilePath(path) {
+		_, err := os.Stat(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				return errors.FileNotFound(path)
+			}
 			return err
 		}
 	}

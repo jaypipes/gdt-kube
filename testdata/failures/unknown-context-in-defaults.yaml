@@ -5,5 +5,5 @@ defaults:
      context: unknownctx
 tests:
  - kube:
-     create: testdata/pod.yaml
+     create: testdata/manifests/nginx-pod.yaml
 

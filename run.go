@@ -142,7 +142,7 @@ func (s *Spec) runCreate(
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return ManifestNotFound(path), true
+				return err, true
 			}
 			return err, true
 		}
@@ -230,7 +230,7 @@ func (s *Spec) runDelete(
 		f, err := os.Open(path)
 		if err != nil {
 			if os.IsNotExist(err) {
-				return ManifestNotFound(path), true
+				return err, true
 			}
 			return err, true
 		}

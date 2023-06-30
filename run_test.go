@@ -11,7 +11,6 @@ import (
 
 	"github.com/jaypipes/gdt"
 	gdtcontext "github.com/jaypipes/gdt-core/context"
-	"github.com/jaypipes/gdt-core/errors"
 	"github.com/jaypipes/gdt-core/scenario"
 	gdtkube "github.com/jaypipes/gdt-kube"
 	kindfix "github.com/jaypipes/gdt-kube/fixtures/kind"
@@ -119,36 +118,6 @@ func TestGetPodNotFound(t *testing.T) {
 	require.Nil(err)
 }
 
-func TestCreateFileNotFound(t *testing.T) {
-	skipIfKind(t)
-	require := require.New(t)
-	assert := assert.New(t)
-
-	fp := filepath.Join("testdata", "create-file-not-found.yaml")
-	f, err := os.Open(fp)
-	require.Nil(err)
-
-	kfix := kindfix.New()
-
-	ctx := gdtcontext.New()
-	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
-	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
-
-	s, err := scenario.FromReader(
-		f,
-		scenario.WithPath(fp),
-		scenario.WithContext(ctx),
-	)
-	require.Nil(err)
-	require.NotNil(s)
-
-	err = s.Run(ctx, t)
-	require.NotNil(err)
-	require.IsType(err, &errors.RuntimeErrors{})
-	re := err.(*errors.RuntimeErrors)
-	assert.True(re.Has(gdtkube.ErrRuntimeManifestNotFound))
-}
-
 func TestCreateUnknownResource(t *testing.T) {
 	skipIfKind(t)
 	require := require.New(t)
@@ -193,36 +162,6 @@ func TestCreateUnknownResourceUsingGDT(t *testing.T) {
 	ctx = gdt.RegisterFixture(ctx, "kind", kfix)
 	err = s.Run(ctx, t)
 	require.Nil(err)
-}
-
-func TestDeleteFileNotFound(t *testing.T) {
-	skipIfKind(t)
-	require := require.New(t)
-	assert := assert.New(t)
-
-	fp := filepath.Join("testdata", "delete-file-not-found.yaml")
-	f, err := os.Open(fp)
-	require.Nil(err)
-
-	kfix := kindfix.New()
-
-	ctx := gdtcontext.New()
-	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
-	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
-
-	s, err := scenario.FromReader(
-		f,
-		scenario.WithPath(fp),
-		scenario.WithContext(ctx),
-	)
-	require.Nil(err)
-	require.NotNil(s)
-
-	err = s.Run(ctx, t)
-	require.NotNil(err)
-	require.IsType(err, &errors.RuntimeErrors{})
-	re := err.(*errors.RuntimeErrors)
-	assert.True(re.Has(gdtkube.ErrRuntimeManifestNotFound))
 }
 
 func TestDeleteResourceNotFound(t *testing.T) {

@@ -55,14 +55,6 @@ var (
 		"%w: invalid resource specifier or filepath",
 		gdterrors.ErrInvalid,
 	)
-	// ErrRuntimeManifestNotFound is returned when a file path does not exist
-	// for a create/apply/delete target. This is a runtime error because we do
-	// not check for target file path existence during parsing in order to lazy
-	// evaluate environment variables and other things.
-	ErrRuntimeManifestNotFound = fmt.Errorf(
-		"%w: manifest not found",
-		gdterrors.ErrRuntime,
-	)
 	// ErrRuntimeResourceUnknown is returned when an unknown resource kind is
 	// specified for a create/apply/delete target. This is a runtime error
 	// because we rely on the discovery client to determine whether a resource
@@ -88,11 +80,6 @@ func InvalidResourceSpecifier(subject string) error {
 // ErrInvalidResourceSpecifierOrFilepath for a given supplied subject.
 func InvalidResourceSpecifierOrFilepath(subject string) error {
 	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifierOrFilepath, subject)
-}
-
-// ManifestNotFound returns ErrRuntimeManifestNotFound for a given file path
-func ManifestNotFound(path string) error {
-	return fmt.Errorf("%w: %s", ErrRuntimeManifestNotFound, path)
 }
 
 // ResourceUnknown returns ErrRuntimeResourceUnknown for a given kind
