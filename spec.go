@@ -66,7 +66,7 @@ type KubeSpec struct {
 	// call (Create, Apply, Get, etc)
 	// TODO(jaypipes): Make this polymorphic to be either a single assertion
 	// struct or a list of assertion structs
-	Assert *Assertions `yaml:"assert,omitempty"`
+	Assert *Expect `yaml:"assert,omitempty"`
 }
 
 // Spec describes a test of a *single* Kubernetes API request and response.

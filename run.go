@@ -14,7 +14,6 @@ import (
 	"testing"
 
 	"github.com/jaypipes/gdt-core/result"
-	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,32 +23,19 @@ import (
 // Run executes the test described by the Kubernetes test. A new Kubernetes
 // client request is made during this call.
 func (s *Spec) Run(ctx context.Context, t *testing.T) error {
-	var ok bool
 	c, err := s.connect(ctx)
 	if err != nil {
 		return err
 	}
 	t.Run(s.Title(), func(t *testing.T) {
 		if s.Kube.Get != "" {
-			err, ok = s.runGet(ctx, t, c)
-			assert.True(t, ok, err)
-			if !ok {
-				// TODO(jaypipes): retry until the timeout
-			}
+			err = s.runGet(ctx, t, c)
 		}
 		if s.Kube.Create != "" {
-			err, ok = s.runCreate(ctx, t, c)
-			assert.True(t, ok, err)
-			if !ok {
-				// TODO(jaypipes): retry until the timeout
-			}
+			err = s.runCreate(ctx, t, c)
 		}
 		if s.Kube.Delete != "" {
-			err, ok = s.runDelete(ctx, t, c)
-			assert.True(t, ok, err)
-			if !ok {
-				// TODO(jaypipes): retry until the timeout
-			}
+			err = s.runDelete(ctx, t, c)
 		}
 	})
 	return result.New(
@@ -64,17 +50,18 @@ func (s *Spec) runGet(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) (error, bool) {
-	assertions := s.Kube.Assert
-
+) error {
 	kind, name := splitKindName(s.Kube.Get)
 	gvk := schema.GroupVersionKind{
 		Kind: kind,
 	}
 	res, err := c.gvrFromGVK(gvk)
-	err, ok := assertions.OK(err, nil)
-	if !ok {
-		return err, false
+	a := newAssertions(s.Kube.Assert, err, nil)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+		return nil
 	}
 	if name == "" {
 		return s.doList(ctx, t, c, res, s.Namespace())
@@ -90,13 +77,18 @@ func (s *Spec) doList(
 	c *connection,
 	res schema.GroupVersionResource,
 	namespace string,
-) (error, bool) {
-	assertions := s.Kube.Assert
+) error {
 	list, err := c.client.Resource(res).Namespace(namespace).List(
 		ctx,
 		metav1.ListOptions{},
 	)
-	return assertions.OK(err, list)
+	a := newAssertions(s.Kube.Assert, err, list)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+	}
+	return nil
 }
 
 // doGet performs the Get() call and assertion check for a supplied resource
@@ -108,14 +100,19 @@ func (s *Spec) doGet(
 	res schema.GroupVersionResource,
 	name string,
 	namespace string,
-) (error, bool) {
-	assertions := s.Kube.Assert
-	_, err := c.client.Resource(res).Namespace(namespace).Get(
+) error {
+	obj, err := c.client.Resource(res).Namespace(namespace).Get(
 		ctx,
 		name,
 		metav1.GetOptions{},
 	)
-	return assertions.OK(err, nil)
+	a := newAssertions(s.Kube.Assert, err, obj)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+	}
+	return nil
 }
 
 // splitKindName returns the Kind for a supplied `Get` or `Delete` command
@@ -132,19 +129,14 @@ func (s *Spec) runCreate(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) (error, bool) {
-	assertions := s.Kube.Assert
-
+) error {
 	var err error
 	var r io.Reader
 	if probablyFilePath(s.Kube.Create) {
 		path := s.Kube.Create
 		f, err := os.Open(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return err, true
-			}
-			return err, true
+			return err
 		}
 		defer f.Close()
 		r = f
@@ -156,7 +148,7 @@ func (s *Spec) runCreate(
 
 	objs, err := unstructuredFromReader(r)
 	if err != nil {
-		return err, true
+		return err
 	}
 	for _, obj := range objs {
 		gvk := obj.GetObjectKind().GroupVersionKind()
@@ -165,11 +157,14 @@ func (s *Spec) runCreate(
 			ns = s.Namespace()
 		}
 		res, err := c.gvrFromGVK(gvk)
-		err, ok := assertions.OK(err, nil)
-		if !ok {
-			return err, false
+		a := newAssertions(s.Kube.Assert, err, nil)
+		if !a.OK() {
+			for _, f := range a.Failures() {
+				t.Error(f)
+			}
+			return nil
 		}
-		resp, err := c.client.Resource(res).Namespace(ns).Create(
+		obj, err := c.client.Resource(res).Namespace(ns).Create(
 			ctx,
 			obj,
 			metav1.CreateOptions{},
@@ -178,12 +173,14 @@ func (s *Spec) runCreate(
 		// object that was created, which is wrong. When I add the polymorphism
 		// to the Assertions struct, I will modify this block to look for an
 		// indexed set of error assertions.
-		err, ok = assertions.OK(err, resp)
-		if !ok {
-			return err, false
+		a = newAssertions(s.Kube.Assert, err, obj)
+		if !a.OK() {
+			for _, f := range a.Failures() {
+				t.Error(f)
+			}
 		}
 	}
-	return nil, true
+	return nil
 }
 
 // unstructuredFromReader attempts to read the supplied io.Reader and unmarshal
@@ -222,29 +219,27 @@ func (s *Spec) runDelete(
 	ctx context.Context,
 	t *testing.T,
 	c *connection,
-) (error, bool) {
-	assertions := s.Kube.Assert
-
+) error {
 	if probablyFilePath(s.Kube.Delete) {
 		path := s.Kube.Delete
 		f, err := os.Open(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				return err, true
-			}
-			return err, true
+			return err
 		}
 		defer f.Close()
 		objs, err := unstructuredFromReader(f)
 		if err != nil {
-			return err, true
+			return err
 		}
 		for _, obj := range objs {
 			gvk := obj.GetObjectKind().GroupVersionKind()
 			res, err := c.gvrFromGVK(gvk)
-			err, ok := assertions.OK(err, nil)
-			if !ok {
-				return err, false
+			a := newAssertions(s.Kube.Assert, err, nil)
+			if !a.OK() {
+				for _, f := range a.Failures() {
+					t.Error(f)
+				}
+				return nil
 			}
 			name := obj.GetName()
 			ns := obj.GetNamespace()
@@ -255,11 +250,11 @@ func (s *Spec) runDelete(
 			// object that was deleted, which is wrong. When I add the polymorphism
 			// to the Assertions struct, I will modify this block to look for an
 			// indexed set of error assertions.
-			if err, ok = s.doDelete(ctx, t, c, res, name, ns); !ok {
-				return err, false
+			if err = s.doDelete(ctx, t, c, res, name, ns); err != nil {
+				return err
 			}
 		}
-		return nil, true
+		return nil
 	}
 
 	kind, name := splitKindName(s.Kube.Delete)
@@ -269,9 +264,12 @@ func (s *Spec) runDelete(
 		Kind:    kind,
 	}
 	res, err := c.gvrFromGVK(gvk)
-	err, ok := assertions.OK(err, nil)
-	if !ok {
-		return err, false
+	a := newAssertions(s.Kube.Assert, err, nil)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+		return nil
 	}
 	if name == "" {
 		return s.doDeleteCollection(ctx, t, c, res, s.Namespace())
@@ -288,14 +286,19 @@ func (s *Spec) doDelete(
 	res schema.GroupVersionResource,
 	name string,
 	namespace string,
-) (error, bool) {
-	assertions := s.Kube.Assert
+) error {
 	err := c.client.Resource(res).Namespace(namespace).Delete(
 		ctx,
 		name,
 		metav1.DeleteOptions{},
 	)
-	return assertions.OK(err, nil)
+	a := newAssertions(s.Kube.Assert, err, nil)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+	}
+	return nil
 }
 
 // doDeleteCollection performs the DeleteCollection() call and assertion check
@@ -306,12 +309,17 @@ func (s *Spec) doDeleteCollection(
 	c *connection,
 	res schema.GroupVersionResource,
 	namespace string,
-) (error, bool) {
-	assertions := s.Kube.Assert
+) error {
 	err := c.client.Resource(res).Namespace(namespace).DeleteCollection(
 		ctx,
 		metav1.DeleteOptions{},
 		metav1.ListOptions{},
 	)
-	return assertions.OK(err, nil)
+	a := newAssertions(s.Kube.Assert, err, nil)
+	if !a.OK() {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+	}
+	return nil
 }

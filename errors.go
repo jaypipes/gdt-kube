@@ -55,13 +55,20 @@ var (
 		"%w: invalid resource specifier or filepath",
 		gdterrors.ErrInvalid,
 	)
-	// ErrRuntimeResourceUnknown is returned when an unknown resource kind is
+	// ErrResourceUnknown is returned when an unknown resource kind is
 	// specified for a create/apply/delete target. This is a runtime error
 	// because we rely on the discovery client to determine whether a resource
 	// kind is valid.
-	ErrRuntimeResourceUnknown = fmt.Errorf(
+	ErrResourceUnknown = fmt.Errorf(
 		"%w: resource unknown",
-		gdterrors.ErrRuntime,
+		gdterrors.ErrFailure,
+	)
+	// ErrExpectedNotFound is returned when we expected to get either a
+	// NotFound response code (get) or an empty set of results (list) but did
+	// not find that.
+	ErrExpectedNotFound = fmt.Errorf(
+		"%w: expected not found",
+		gdterrors.ErrFailure,
 	)
 )
 
@@ -84,5 +91,11 @@ func InvalidResourceSpecifierOrFilepath(subject string) error {
 
 // ResourceUnknown returns ErrRuntimeResourceUnknown for a given kind
 func ResourceUnknown(kind string) error {
-	return fmt.Errorf("%w: %s", ErrRuntimeResourceUnknown, kind)
+	return fmt.Errorf("%w: %s", ErrResourceUnknown, kind)
+}
+
+// ExpectedNotFound returns ErrExpectedNotFound for a given status code or
+// number of items.
+func ExpectedNotFound(msg string) error {
+	return fmt.Errorf("%w: %s", ErrExpectedNotFound, msg)
 }
