@@ -7,11 +7,9 @@ package kube
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	gdtcontext "github.com/jaypipes/gdt-core/context"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	discocached "k8s.io/client-go/discovery/cached/memory"
@@ -101,12 +99,6 @@ type connection struct {
 	mapper meta.RESTMapper
 	disco  discovery.CachedDiscoveryInterface
 	client dynamic.Interface
-	// resourceInfo is a map, keyed by lowercase resource Kind, Plural Kind or
-	// shortname/alias, of the APIResource with the Group and Version set
-	// properly to theAPIGroup and preferred APIVersion for that group. When
-	// resources are not specified with a version (or a group version), we use
-	// this as a lookup.
-	resourceLookup map[string]*metav1.APIResource
 }
 
 // mappingFor returns a RESTMapper for a given resource type or kind
@@ -186,54 +178,12 @@ func (s *Spec) connect(ctx context.Context) (*connection, error) {
 		return nil, err
 	}
 	disco := discocached.NewMemCacheClient(discoverer)
-	apiGroups, resourceLists, err := disco.ServerGroupsAndResources()
-	if err != nil {
-		return nil, err
-	}
-	preferredVersions := map[string]string{}
-	for _, apiGroup := range apiGroups {
-		preferredVersions[apiGroup.Name] = apiGroup.PreferredVersion.Version
-	}
-	resLookup := map[string]*metav1.APIResource{}
-	for _, resList := range resourceLists {
-		gvParts := strings.SplitN(resList.GroupVersion, "/", 1)
-		g := gvParts[0]
-		if len(gvParts) == 1 {
-			g = ""
-		}
-		pv := preferredVersions[g]
-		for _, res := range resList.APIResources {
-			// Some APIResources, e.g. deployment/status, have a slash in their
-			// Name but their Kind overlaps the full resource, so we skip
-			// these...
-			if strings.ContainsRune(res.Name, '/') {
-				continue
-			}
-			r := &metav1.APIResource{
-				Name:               res.Name,
-				SingularName:       res.SingularName,
-				Group:              g,
-				Version:            pv,
-				Kind:               res.Kind,
-				Verbs:              res.Verbs,
-				ShortNames:         res.ShortNames,
-				Categories:         res.Categories,
-				StorageVersionHash: res.StorageVersionHash,
-			}
-			resLookup[strings.ToLower(res.Name)] = r
-			resLookup[strings.ToLower(res.Kind)] = r
-			for _, alias := range res.ShortNames {
-				resLookup[strings.ToLower(alias)] = r
-			}
-		}
-	}
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(disco)
 	expander := restmapper.NewShortcutExpander(mapper, disco)
 
 	return &connection{
-		mapper:         expander,
-		disco:          disco,
-		client:         c,
-		resourceLookup: resLookup,
+		mapper: expander,
+		disco:  disco,
+		client: c,
 	}, nil
 }
