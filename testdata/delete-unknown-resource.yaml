@@ -6,4 +6,4 @@ tests:
  - kube:
      delete: unknown/unknown
      assert:
-       notfound: true
+       unknown: true

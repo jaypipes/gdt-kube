@@ -6,14 +6,18 @@ package kube
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	gdtcontext "github.com/jaypipes/gdt-core/context"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
+	discocached "k8s.io/client-go/discovery/cached/memory"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -86,55 +90,66 @@ func (s *Spec) Config(ctx context.Context) (*rest.Config, error) {
 	).ClientConfig()
 }
 
+type groupVersion struct {
+	group   string
+	version string
+}
+
 // connection is a struct containing a discovery client and a dynamic client
 // that the Spec uses to communicate with Kubernetes.
 type connection struct {
-	disco  discovery.DiscoveryInterface
+	mapper meta.RESTMapper
+	disco  discovery.CachedDiscoveryInterface
 	client dynamic.Interface
-	// preferredVersions is a map, keyed by APIGroup, of the preferred
-	// APIVersion for that group. When resources are not specified with a
-	// version (or a group version), we use this as a lookup.
-	preferredVersions map[string]string
+	// resourceInfo is a map, keyed by lowercase resource Kind, Plural Kind or
+	// shortname/alias, of the APIResource with the Group and Version set
+	// properly to theAPIGroup and preferred APIVersion for that group. When
+	// resources are not specified with a version (or a group version), we use
+	// this as a lookup.
+	resourceLookup map[string]*metav1.APIResource
 }
 
-// apiResourceFromGVK returns the metav1.APIResource (which is basically the
-// GVK with the plural form of the Kind and some metadata about whether the
-// resource is namespace scoped, etc) corresponding to the supplied
-// GroupVersionKind. If no match could be made, returns
-// ErrRuntimeResourceUnknown.
-func (c *connection) apiResourceFromGVK(
-	gvk schema.GroupVersionKind,
-) (metav1.APIResource, error) {
-	empty := metav1.APIResource{}
-	var pv string
-	var pvFound bool
-	if gvk.Version == "" {
-		pv, pvFound = c.preferredVersions[gvk.Group]
-		if !pvFound {
-			return empty, ResourceUnknown(gvk.Kind)
-		}
-		gvk.Version = pv
+// mappingFor returns a RESTMapper for a given resource type or kind
+func (c *connection) mappingFor(typeOrKind string) (*meta.RESTMapping, error) {
+	fullySpecifiedGVR, groupResource := schema.ParseResourceArg(typeOrKind)
+	gvk := schema.GroupVersionKind{}
+
+	if fullySpecifiedGVR != nil {
+		gvk, _ = c.mapper.KindFor(*fullySpecifiedGVR)
 	}
-	resources, err := c.disco.ServerResourcesForGroupVersion(
-		gvk.GroupVersion().String(),
-	)
+	if gvk.Empty() {
+		gvk, _ = c.mapper.KindFor(groupResource.WithVersion(""))
+	}
+	if !gvk.Empty() {
+		return c.mapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	}
+
+	fullySpecifiedGVK, groupKind := schema.ParseKindArg(typeOrKind)
+	if fullySpecifiedGVK == nil {
+		gvk := groupKind.WithVersion("")
+		fullySpecifiedGVK = &gvk
+	}
+
+	if !fullySpecifiedGVK.Empty() {
+		if mapping, err := c.mapper.RESTMapping(fullySpecifiedGVK.GroupKind(), fullySpecifiedGVK.Version); err == nil {
+			return mapping, nil
+		}
+	}
+
+	mapping, err := c.mapper.RESTMapping(groupKind, gvk.Version)
 	if err != nil {
-		return empty, ResourceUnknown(gvk.Kind)
-	}
-
-	for _, r := range resources.APIResources {
-		if strings.EqualFold(r.Kind, gvk.Kind) || strings.EqualFold(r.Name, gvk.Kind) {
-			// NOTE(jaypipes): This is crazy that we need to do this, but
-			// APIResource objects in the ServerResourcesForGroupVersion don't
-			// necessarily have their Version fields set.
-			if r.Version == "" {
-				r.Version = pv
-			}
-			return r, nil
+		// if we error out here, it is because we could not match a resource or a kind
+		// for the given argument. To maintain consistency with previous behavior,
+		// announce that a resource type could not be found.
+		// if the error is _not_ a *meta.NoKindMatchError, then we had trouble doing discovery,
+		// so we should return the original error since it may help a user diagnose what is actually wrong
+		if meta.IsNoMatchError(err) {
+			return nil, fmt.Errorf("the server doesn't have a resource type %q", groupResource.Resource)
 		}
+		return nil, err
 	}
 
-	return empty, ResourceUnknown(gvk.Kind)
+	return mapping, nil
 }
 
 // gvrFromGVK returns a GroupVersionResource from a GroupVersionKind, using the
@@ -146,22 +161,12 @@ func (c *connection) gvrFromGVK(
 	gvk schema.GroupVersionKind,
 ) (schema.GroupVersionResource, error) {
 	empty := schema.GroupVersionResource{}
-	ar, err := c.apiResourceFromGVK(gvk)
+	r, err := c.mappingFor(gvk.Kind)
 	if err != nil {
-		return empty, nil
+		return empty, ResourceUnknown(gvk)
 	}
-	gvr := schema.GroupVersionResource{
-		Group:    ar.Group,
-		Version:  ar.Version,
-		Resource: ar.Name,
-	}
-	if gvr.Group == "" {
-		gvr.Group = gvk.Group
-	}
-	if gvr.Version == "" {
-		gvr.Version = gvk.Version
-	}
-	return gvr, nil
+
+	return r.Resource, nil
 }
 
 // connect returns a connection with a discovery client and a Kubernetes
@@ -176,22 +181,59 @@ func (s *Spec) connect(ctx context.Context) (*connection, error) {
 	if err != nil {
 		return nil, err
 	}
-	disco, err := discovery.NewDiscoveryClientForConfig(cfg)
+	discoverer, err := discovery.NewDiscoveryClientForConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	apiGroups, err := disco.ServerGroups()
+	disco := discocached.NewMemCacheClient(discoverer)
+	apiGroups, resourceLists, err := disco.ServerGroupsAndResources()
 	if err != nil {
 		return nil, err
 	}
-	prefVersions := map[string]string{}
-	for _, apiGroup := range apiGroups.Groups {
-		prefVersions[apiGroup.Name] = apiGroup.PreferredVersion.Version
+	preferredVersions := map[string]string{}
+	for _, apiGroup := range apiGroups {
+		preferredVersions[apiGroup.Name] = apiGroup.PreferredVersion.Version
 	}
+	resLookup := map[string]*metav1.APIResource{}
+	for _, resList := range resourceLists {
+		gvParts := strings.SplitN(resList.GroupVersion, "/", 1)
+		g := gvParts[0]
+		if len(gvParts) == 1 {
+			g = ""
+		}
+		pv := preferredVersions[g]
+		for _, res := range resList.APIResources {
+			// Some APIResources, e.g. deployment/status, have a slash in their
+			// Name but their Kind overlaps the full resource, so we skip
+			// these...
+			if strings.ContainsRune(res.Name, '/') {
+				continue
+			}
+			r := &metav1.APIResource{
+				Name:               res.Name,
+				SingularName:       res.SingularName,
+				Group:              g,
+				Version:            pv,
+				Kind:               res.Kind,
+				Verbs:              res.Verbs,
+				ShortNames:         res.ShortNames,
+				Categories:         res.Categories,
+				StorageVersionHash: res.StorageVersionHash,
+			}
+			resLookup[strings.ToLower(res.Name)] = r
+			resLookup[strings.ToLower(res.Kind)] = r
+			for _, alias := range res.ShortNames {
+				resLookup[strings.ToLower(alias)] = r
+			}
+		}
+	}
+	mapper := restmapper.NewDeferredDiscoveryRESTMapper(disco)
+	expander := restmapper.NewShortcutExpander(mapper, disco)
 
 	return &connection{
-		disco:             disco,
-		client:            c,
-		preferredVersions: prefVersions,
+		mapper:         expander,
+		disco:          disco,
+		client:         c,
+		resourceLookup: resLookup,
 	}, nil
 }

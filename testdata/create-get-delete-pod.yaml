@@ -12,9 +12,9 @@ tests:
   - name: delete-pod
     kube:
       delete: pods/nginx
-  # TODO(jaypipes): remove this when waiters/retries are implemented.
-  - name: sleep-a-bit
-    exec: sleep 10
+  # TODO(jaypipes): refactor this when retries are implemented.
+    wait:
+      after: 3s
   - name: pod-no-longer-exists
     kube:
       get: pods/nginx

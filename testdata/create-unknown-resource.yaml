@@ -10,4 +10,4 @@ tests:
        metadata:
          name: unknown
      assert:
-       notfound: true
+       unknown: true

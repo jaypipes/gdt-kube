@@ -16,11 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const (
-	msgExpectedError = "Expected response to have error containing %s but got %s"
-	msgExpectedLen   = "Expected response to have %d items in result but got %d"
-)
-
 // Expect contains one or more assertions about a kube client call
 type Expect struct {
 	// Error is a string that is expected to be returned as an error string
@@ -42,6 +37,66 @@ type Expect struct {
 	// from the Kubernetes API server. This is mostly good for unit/fuzz
 	// testing CRDs.
 	Unknown bool `yaml:"unknown,omitempty"`
+	// Matches is either a string or a map[string]interface{} containing the
+	// resource that the `Kube.Get` should match against. If Matches is a
+	// string, the string can be either a file path to a YAML manifest or
+	// inline an YAML string containing the resource fields to compare.
+	//
+	// Only fields present in the Matches resource are compared. There is a
+	// check for existence in the retrieved resource as well as a check that
+	// the value of the fields match. Only scalar fields are matched entirely.
+	// In other words, you do not need to specify every field of a struct field
+	// in order to compare the value of a single field in the nested struct.
+	//
+	// As an example, imagine you wanted to check that a Deployment resource's
+	// `Status.ReadyReplicas` field was 2. You do not need to specify all other
+	// `Deployment.Status` fields like `Status.Replicas` in order to match the
+	// `Status.ReadyReplicas` field value. You only need to include the
+	// `Status.ReadyReplicas` field in the `Matches` value as these examples
+	// demonstrate:
+	//
+	// ```yaml
+	// tests:
+	//  - name: check deployment's ready replicas is 2
+	//    kube:
+	//      get: deployments/my-deployment
+	//      assert:
+	//        matches: |
+	//          kind: Deployment
+	//          metadata:
+	//            name: my-deployment
+	//          status:
+	//            readyReplicas: 2
+	// ```
+	//
+	// you don't even need to include the kind and metadata in `Matches`. If
+	// missing, no kind and name matching will be performed.
+	//
+	// ```yaml
+	// tests:
+	//  - name: check deployment's ready replicas is 2
+	//    kube:
+	//      get: deployments/my-deployment
+	//      assert:
+	//        matches: |
+	//          status:
+	//            readyReplicas: 2
+	// ```
+	//
+	// In fact, you don't need to use an inline multiline YAML string. You can
+	// use a `map[string]interface{}` as well:
+	//
+	// ```yaml
+	// tests:
+	//  - name: check deployment's ready replicas is 2
+	//    kube:
+	//      get: deployments/my-deployment
+	//      assert:
+	//        matches:
+	//          status:
+	//            readyReplicas: 2
+	// ```
+	Matches interface{} `yaml:"matches,omitempty"`
 }
 
 // assertions contains all assertions made for the exec test
@@ -100,13 +155,10 @@ func (a *assertions) OK() bool {
 	if !a.errorOK() {
 		return false
 	}
-	if !a.unknownOK() {
-		return false
-	}
-	if !a.notFoundOK() {
-		return false
-	}
 	if !a.lenOK() {
+		return false
+	}
+	if !a.matchesOK() {
 		return false
 	}
 	return true
@@ -116,7 +168,36 @@ func (a *assertions) OK() bool {
 // false otherwise.
 func (a *assertions) errorOK() bool {
 	exp := a.exp
-	if exp.Error != "" {
+	// We first evaluate whether an error we have received should be
+	// "swallowed" because it was expected. If we still have an error after
+	// swallowing all unexpected errors, then that is an unexpected error and
+	// we fail.
+	if a.err != nil {
+		if errors.Is(a.err, ErrResourceUnknown) {
+			if !exp.Unknown {
+				a.Fail(a.err)
+				a.terminal = true
+				return false
+			}
+			// "Swallow" the Unknown error since we expected it.
+			a.err = nil
+		}
+		// check if the error is like one returned from Get or Delete
+		// that has a 404 ErrStatus.Code in it
+		apierr, ok := a.err.(*apierrors.StatusError)
+		if ok {
+			if !a.expectsNotFound() {
+				if http.StatusNotFound != int(apierr.ErrStatus.Code) {
+					msg := fmt.Sprintf("got status code %d", apierr.ErrStatus.Code)
+					a.Fail(ExpectedNotFound(msg))
+					return false
+				}
+			}
+			// "Swallow" the NotFound error since we expected it.
+			a.err = nil
+		}
+	}
+	if exp.Error != "" && a.r != nil {
 		if a.err == nil {
 			a.Fail(gdterrors.UnexpectedError(a.err))
 			a.terminal = true
@@ -127,26 +208,23 @@ func (a *assertions) errorOK() bool {
 			return false
 		}
 	}
+	if a.err != nil {
+		a.Fail(gdterrors.UnexpectedError(a.err))
+		a.terminal = true
+		return false
+	}
 	return true
 }
 
-// unknownOK returns true if the supplied error matches the Unknown condition,
-// false otherwise.
-func (a *assertions) unknownOK() bool {
+func (a *assertions) expectsNotFound() bool {
 	exp := a.exp
-	if exp.Unknown {
-		if !errors.Is(a.err, ErrResourceUnknown) {
-			a.Fail(ResourceUnknown(a.err.Error()))
-		}
-	}
-	return true
+	return (exp.Len != nil && *exp.Len == 0) || exp.NotFound
 }
 
 // notFoundOK returns true if the supplied error and response matches the
 // NotFound condition and the Len==0 condition, false otherwise
 func (a *assertions) notFoundOK() bool {
-	exp := a.exp
-	if (exp.Len != nil && *exp.Len == 0) || exp.NotFound {
+	if a.expectsNotFound() {
 		// First check if the error is like one returned from Get or Delete
 		// that has a 404 ErrStatus.Code in it
 		apierr, ok := a.err.(*apierrors.StatusError)
@@ -156,6 +234,7 @@ func (a *assertions) notFoundOK() bool {
 				a.Fail(ExpectedNotFound(msg))
 				return false
 			}
+			return true
 		}
 		// Next check to see if the supplied resp is a list of objects returned
 		// by the dynamic client and if so, is that an empty list.
@@ -166,20 +245,20 @@ func (a *assertions) notFoundOK() bool {
 				a.Fail(ExpectedNotFound(msg))
 				return false
 			}
+			return true
 		}
 	}
 	return true
 }
 
-// lenOK returns true if the supplied error and subject matches the Len
-// condition, false otherwise
+// lenOK returns true if the subject matches the Len condition, false otherwise
 func (a *assertions) lenOK() bool {
 	exp := a.exp
 	if exp.Len != nil {
 		// if the supplied resp is a list of objects returned by the dynamic
 		// client check its length
 		list, ok := a.r.(*unstructured.UnstructuredList)
-		if ok {
+		if ok && list != nil {
 			if len(list.Items) != *exp.Len {
 				a.Fail(gdterrors.NotEqualLength(*exp.Len, len(list.Items)))
 				return false
@@ -187,6 +266,54 @@ func (a *assertions) lenOK() bool {
 		}
 	}
 	return true
+}
+
+// matchesOK returns true if the subject matches the Matches condition, false
+// otherwise
+func (a *assertions) matchesOK() bool {
+	exp := a.exp
+	if exp.Matches != nil && a.hasSubject() {
+		matchObj := matchObjectFromAny(exp.Matches)
+		res, ok := a.r.(*unstructured.Unstructured)
+		if ok {
+			delta := compareResourceToMatchObject(res, matchObj)
+			if !delta.Empty() {
+				for _, diff := range delta.Differences() {
+					a.Fail(MatchesNotEqual(diff))
+				}
+				return false
+			}
+			return true
+		}
+
+		// TODO(jaypipes): if the supplied resp is a list of objects returned
+		// by the dynamic client check each against the supplied matches
+		// fields.
+		//list, ok := a.r.(*unstructured.UnstructuredList)
+		//if ok {
+		//	for _, obj := range list.Items {
+		//      diff := compareResourceToMatchObject(obj, matchObj)
+		//
+		//		a.Fail(gdterrors.NotEqualLength(*exp.Len, len(list.Items)))
+		//		return false
+		//	}
+		//}
+	}
+	return true
+}
+
+// hasSubject returns true if the assertions `r` field (which contains the
+// subject of which we inspect) is not `nil`.
+func (a *assertions) hasSubject() bool {
+	switch a.r.(type) {
+	case *unstructured.Unstructured:
+		v := a.r.(*unstructured.Unstructured)
+		return v != nil
+	case *unstructured.UnstructuredList:
+		v := a.r.(*unstructured.UnstructuredList)
+		return v != nil
+	}
+	return false
 }
 
 // newAssertions returns an assertions object populated with the supplied http

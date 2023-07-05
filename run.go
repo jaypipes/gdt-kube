@@ -259,9 +259,7 @@ func (s *Spec) runDelete(
 
 	kind, name := splitKindName(s.Kube.Delete)
 	gvk := schema.GroupVersionKind{
-		Group:   "",
-		Version: "v1",
-		Kind:    kind,
+		Kind: kind,
 	}
 	res, err := c.gvrFromGVK(gvk)
 	a := newAssertions(s.Kube.Assert, err, nil)
