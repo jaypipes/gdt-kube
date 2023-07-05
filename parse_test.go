@@ -243,6 +243,69 @@ func TestDeleteFileNotFound(t *testing.T) {
 	require.Nil(s)
 }
 
+func TestFailureBadMatchesFileNotFound(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "failures", "bad-matches-file-not-found.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	assert.NotNil(err)
+	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
+	assert.Nil(s)
+}
+
+func TestFailureBadMatchesInvalidYAML(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "failures", "bad-matches-invalid-yaml.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	assert.NotNil(err)
+	assert.ErrorIs(err, gdtkube.ErrMatchesInvalid)
+	assert.Nil(s)
+}
+
+func TestFailureBadMatchesNotMapAny(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "failures", "bad-matches-not-map-any.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	assert.NotNil(err)
+	assert.ErrorIs(err, gdtkube.ErrMatchesInvalid)
+	assert.Nil(s)
+}
+
 func TestParse(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)

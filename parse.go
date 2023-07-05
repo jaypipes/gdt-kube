@@ -165,6 +165,14 @@ func validateKubeSpec(s *Spec) error {
 			return err
 		}
 	}
+	if s.Kube.Assert != nil {
+		exp := s.Kube.Assert
+		if exp.Matches != nil {
+			if err := validateMatches(exp.Matches); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
@@ -210,6 +218,57 @@ func validateResourceIdentifier(subject string) error {
 	}
 	if strings.Count(subject, "/") > 1 {
 		return InvalidResourceSpecifier(subject)
+	}
+	return nil
+}
+
+// resourceTypeAndNameFromIdentifier returns a resource type, which is the
+// shortname, singular or plural of a resource kind, (e.g. "po", "pods" or
+// "pod") and a resource name. The resource name may be empty, in which case
+// the resource identifier refers to a collection of resources.
+//
+// The following formats for a resource identifier string are allowed:
+//
+// * "pods" - pluralized resource type, refers to a collection of Pod resources
+// * "po" - shortname of a resource type, refers to a collection of Pod
+//   resources
+// * "pod" - singular of a resource type, refers to a collection of Pod
+//   resources (because no resource name has been specified)
+// * "pods/my-pod" - pluralized resource type along with a resource name,
+//   refers to a single Pod resource with the name "my-pod"
+// * "pod/my-pod" - singular resource type along with a resource name,
+//   refers to a single Pod resource with the name "my-pod"
+// * "po/my-pod" - shortname of a resource type along with a resource name,
+//   refers to a single Pod resource with the name "my-pod"
+func resourceTypeAndNameFromIdentifier(identifier string) (string, string) {
+	rt := ""
+	rn := ""
+
+	return rt, rn
+}
+
+// validateMatches checks what the test author placed in the `Kube.Matches`
+// field to see if it contains one of:
+// * file path (and checks existence of this file)
+// * inline YAML (and checks that can be unmarshaled)
+// * map[string]interface{}
+func validateMatches(matches interface{}) error {
+	switch matches.(type) {
+	case string:
+		v := matches.(string)
+		if probablyFilePath(v) {
+			return validateFileExists(v)
+		}
+		// inline YAML. Let's quickly check it can be unmarshaled into a
+		// map[string]interface{}
+		var m map[string]interface{}
+		if err := yaml.Unmarshal([]byte(v), &m); err != nil {
+			return MatchesInvalidUnmarshalError(err)
+		}
+	case map[string]interface{}:
+		return nil
+	default:
+		return MatchesInvalid(matches)
 	}
 	return nil
 }

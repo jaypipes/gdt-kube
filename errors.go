@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	gdterrors "github.com/jaypipes/gdt-core/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
@@ -55,6 +56,12 @@ var (
 		"%w: invalid resource specifier or filepath",
 		gdterrors.ErrInvalid,
 	)
+	// ErrMatchesInvalid is returned when the `Kube.Assert.Matches` value is
+	// malformed.
+	ErrMatchesInvalid = fmt.Errorf(
+		"%w: `kube.assert.matches` not well-formed",
+		gdterrors.ErrInvalid,
+	)
 	// ErrResourceUnknown is returned when an unknown resource kind is
 	// specified for a create/apply/delete target. This is a runtime error
 	// because we rely on the discovery client to determine whether a resource
@@ -68,6 +75,12 @@ var (
 	// not find that.
 	ErrExpectedNotFound = fmt.Errorf(
 		"%w: expected not found",
+		gdterrors.ErrFailure,
+	)
+	// ErrMatchesNotEqual is returned when we failed to match a resource to an
+	// object field in a `kube.assert.matches` object.
+	ErrMatchesNotEqual = fmt.Errorf(
+		"%w: match field not equal",
 		gdterrors.ErrFailure,
 	)
 )
@@ -90,12 +103,33 @@ func InvalidResourceSpecifierOrFilepath(subject string) error {
 }
 
 // ResourceUnknown returns ErrRuntimeResourceUnknown for a given kind
-func ResourceUnknown(kind string) error {
-	return fmt.Errorf("%w: %s", ErrResourceUnknown, kind)
+func ResourceUnknown(gvk schema.GroupVersionKind) error {
+	return fmt.Errorf("%w: %s", ErrResourceUnknown, gvk)
 }
 
 // ExpectedNotFound returns ErrExpectedNotFound for a given status code or
 // number of items.
 func ExpectedNotFound(msg string) error {
 	return fmt.Errorf("%w: %s", ErrExpectedNotFound, msg)
+}
+
+// MatchesInvalid returns ErrMatchesInvalid when a `kube.assert.matches` field
+// is not well-formed.
+func MatchesInvalid(matches interface{}) error {
+	return fmt.Errorf(
+		"%w: need string or map[string]interface{} but got %T",
+		ErrMatchesInvalid, matches,
+	)
+}
+
+// MatchesInvalidUnmarshalError returns ErrMatchesInvalid when a `kube.assert.matches` field
+// contains invalid YAML content.
+func MatchesInvalidUnmarshalError(err error) error {
+	return fmt.Errorf("%w: %s", ErrMatchesInvalid, err)
+}
+
+// MatchesNotEqual returns ErrMatchesNotEqual when a `kube.assert.matches` object
+// did not match the returned resource.
+func MatchesNotEqual(msg string) error {
+	return fmt.Errorf("%w: %s", ErrMatchesNotEqual, msg)
 }

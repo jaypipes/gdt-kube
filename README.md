@@ -144,6 +144,17 @@ matches some expectation:
 * `kube.assert.unknown`: (optional) bool indicating the test author expects the
   Kubernetes API server to respond that it does not know the type of resource
   attempting to be fetched or created.
+* `kube.assert.matches`: (optional) a YAML string, a filepath, or a
+  `map[string]interface{}` representing the content that you expect to find in
+  the returned result from the `kube.get` call.
+  If `kube.assert.matches` is a
+  string, the string can be either a file path to a YAML manifest or
+  inline an YAML string containing the resource fields to compare.
+  Only fields present in the Matches resource are compared. There is a
+  check for existence in the retrieved resource as well as a check that
+  the value of the fields match. Only scalar fields are matched entirely.
+  In other words, you do not need to specify every field of a struct field
+  in order to compare the value of a single field in the nested struct.
 
 Here are some examples of `gdt-kube` tests.
 
@@ -241,6 +252,54 @@ tests:
   - kube.create: manifests/deployment.yaml
   - exec: sleep 30
   - exec: ssh -T someuser@ip
+```
+
+A test that checks that a Deployment resource's `Status.ReadyReplicas` field
+is `2`. You do not need to specify all other `Deployment.Status` fields like
+`Status.Replicas` in order to match the `Status.ReadyReplicas` field value. You
+only need to include the `Status.ReadyReplicas` field in the `Matches` value as
+these examples demonstrate:
+
+```yaml
+tests:
+ - name: check deployment's ready replicas is 2
+   kube:
+     get: deployments/my-deployment
+     assert:
+       matches: |
+         kind: Deployment
+         metadata:
+           name: my-deployment
+         status:
+           readyReplicas: 2
+```
+
+you don't even need to include the kind and metadata in `kube.assert.matches`.
+If missing, no kind and name matching will be performed.
+
+```yaml
+tests:
+ - name: check deployment's ready replicas is 2
+   kube:
+     get: deployments/my-deployment
+     assert:
+       matches: |
+         status:
+           readyReplicas: 2
+```
+
+In fact, you don't need to use an inline multiline YAML string. You can
+use a `map[string]interface{}` as well:
+
+```yaml
+tests:
+ - name: check deployment's ready replicas is 2
+   kube:
+     get: deployments/my-deployment
+     assert:
+       matches:
+         status:
+           readyReplicas: 2
 ```
 
 ## Determining Kubernetes config, context and namespace values
