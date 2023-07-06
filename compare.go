@@ -88,6 +88,7 @@ func collectFieldDifferences(
 			fp, match, subject,
 		)
 		delta.Add(diff)
+		return
 	}
 	switch match.(type) {
 	case map[string]interface{}:
@@ -99,6 +100,7 @@ func collectFieldDifferences(
 			if !ok {
 				diff := fmt.Sprintf("%s not present in subject", newfp)
 				delta.Add(diff)
+				continue
 			}
 			collectFieldDifferences(newfp, matchv, subjectv, delta)
 		}
@@ -112,6 +114,7 @@ func collectFieldDifferences(
 				fp, len(matchlist), len(subjectlist),
 			)
 			delta.Add(diff)
+			return
 		}
 		// Sort order currently matters, unfortunately...
 		for x, matchv := range matchlist {
