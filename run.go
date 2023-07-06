@@ -12,12 +12,22 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	backoff "github.com/cenkalti/backoff/v4"
+	"github.com/jaypipes/gdt-core/debug"
 	"github.com/jaypipes/gdt-core/result"
+	gdttypes "github.com/jaypipes/gdt-core/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/yaml"
+)
+
+const (
+	// defaultGetTimeout is used as a retry max time if the spec's Timeout has
+	// not been specified.
+	defaultGetTimeout = time.Second * 5
 )
 
 // Run executes the test described by the Kubernetes test. A new Kubernetes
@@ -63,10 +73,54 @@ func (s *Spec) runGet(
 		}
 		return nil
 	}
-	if name == "" {
-		return s.doList(ctx, t, c, res, s.Namespace())
+
+	// if the Spec has no timeout, default it to a reasonable value
+	var cancel context.CancelFunc
+	_, hasDeadline := ctx.Deadline()
+	if !hasDeadline {
+		ctx, cancel = context.WithTimeout(ctx, defaultGetTimeout)
+		defer cancel()
 	}
-	return s.doGet(ctx, t, c, res, name, s.Namespace())
+
+	// retry the Get/List and test the assertions until they succeed, there is
+	// a terminal failure, or the timeout expires.
+	bo := backoff.WithContext(backoff.NewExponentialBackOff(), ctx)
+	ticker := backoff.NewTicker(bo)
+	attempts := 0
+	success := false
+	start := time.Now().UTC()
+	for tick := range ticker.C {
+		attempts++
+		after := tick.Sub(start)
+
+		if name == "" {
+			a = s.doList(ctx, t, c, res, s.Namespace())
+		} else {
+			a = s.doGet(ctx, t, c, res, name, s.Namespace())
+		}
+		success := a.OK()
+		term := a.Terminal()
+		debug.Println(
+			ctx, "%s (try %d after %s) ok: %v, terminal: %v",
+			s.Title(), attempts, after, success, term,
+		)
+		if success || term {
+			ticker.Stop()
+			break
+		}
+		for _, f := range a.Failures() {
+			debug.Println(
+				ctx, "%s (try %d after %s) failure: %s",
+				s.Title(), attempts, after, f,
+			)
+		}
+	}
+	if !success {
+		for _, f := range a.Failures() {
+			t.Error(f)
+		}
+	}
+	return nil
 }
 
 // doList performs the List() call and assertion check for a supplied resource
@@ -77,18 +131,12 @@ func (s *Spec) doList(
 	c *connection,
 	res schema.GroupVersionResource,
 	namespace string,
-) error {
+) gdttypes.Assertions {
 	list, err := c.client.Resource(res).Namespace(namespace).List(
 		ctx,
 		metav1.ListOptions{},
 	)
-	a := newAssertions(s.Kube.Assert, err, list)
-	if !a.OK() {
-		for _, f := range a.Failures() {
-			t.Error(f)
-		}
-	}
-	return nil
+	return newAssertions(s.Kube.Assert, err, list)
 }
 
 // doGet performs the Get() call and assertion check for a supplied resource
@@ -100,19 +148,13 @@ func (s *Spec) doGet(
 	res schema.GroupVersionResource,
 	name string,
 	namespace string,
-) error {
+) gdttypes.Assertions {
 	obj, err := c.client.Resource(res).Namespace(namespace).Get(
 		ctx,
 		name,
 		metav1.GetOptions{},
 	)
-	a := newAssertions(s.Kube.Assert, err, obj)
-	if !a.OK() {
-		for _, f := range a.Failures() {
-			t.Error(f)
-		}
-	}
-	return nil
+	return newAssertions(s.Kube.Assert, err, obj)
 }
 
 // splitKindName returns the Kind for a supplied `Get` or `Delete` command

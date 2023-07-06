@@ -302,6 +302,105 @@ tests:
            readyReplicas: 2
 ```
 
+### Timeouts and retrying `kube.get` assertions
+
+When evaluating `kube.assert.matches` conditions for `kube.get`, `gdt` inspects
+the test's `timeout.after` value to determine how long to retry the `get` call
+and recheck the assertions. If `timeout.after` is empty, `gdt` uses a **default
+timeout of 5 seconds**.
+
+If you're interested in seeing the individual results of `gdt`'s
+assertion-checks for a single `get` call, you can use the `gdt.WithDebug()`
+function, like this test function demonstrates:
+
+file: `testdata/matches.yaml`:
+
+```yaml
+name: matches
+description: create a deployment and check the matches condition succeeds
+require:
+  - kind
+tests:
+  - name: create-deployment
+    kube:
+      create: testdata/manifests/nginx-deployment.yaml
+  - name: deployment-exists
+    kube:
+      get: deployments/nginx
+      assert:
+        matches:
+          spec:
+            replicas: 2
+            template:
+              metadata:
+                labels:
+                  app: nginx
+          status:
+            readyReplicas: 2
+  - name: delete-deployment
+    kube:
+      delete: deployments/nginx
+```
+
+file: `matches_test.go`
+
+```go
+import (
+    "github.com/jaypipes/gdt"
+    . "github.com/jaypipes/gdt-kube"
+    kindfix "github.com/jaypipes/gdt-kube/fixture/kind"
+)
+
+func TestMatches(t *testing.T) {
+	fp := filepath.Join("testdata", "matches.yaml")
+
+	kfix := kindfix.New()
+
+	s, err := gdt.From(fp)
+
+	ctx := gdt.NewContext(gdt.WithDebug(os.Stdout))
+	ctx = gdt.RegisterFixture(ctx, "kind", kfix)
+	s.Run(ctx, t)
+}
+```
+
+Here's what running `go test -v matches_test.go` would look like:
+
+```
+$ go test -v matches_test.go
+=== RUN   TestMatches
+=== RUN   TestMatches/matches
+=== RUN   TestMatches/matches/create-deployment
+=== RUN   TestMatches/matches/deployment-exists
+deployment-exists (try 1 after 1.303µs) ok: false, terminal: false
+deployment-exists (try 1 after 1.303µs) failure: assertion failed: match field not equal: $.status.readyReplicas not present in subject
+deployment-exists (try 2 after 595.62786ms) ok: false, terminal: false
+deployment-exists (try 2 after 595.62786ms) failure: assertion failed: match field not equal: $.status.readyReplicas not present in subject
+deployment-exists (try 3 after 1.020003807s) ok: false, terminal: false
+deployment-exists (try 3 after 1.020003807s) failure: assertion failed: match field not equal: $.status.readyReplicas not present in subject
+deployment-exists (try 4 after 1.760006109s) ok: false, terminal: false
+deployment-exists (try 4 after 1.760006109s) failure: assertion failed: match field not equal: $.status.readyReplicas had different values. expected 2 but found 1
+deployment-exists (try 5 after 2.772416449s) ok: true, terminal: false
+=== RUN   TestMatches/matches/delete-deployment
+--- PASS: TestMatches (3.32s)
+    --- PASS: TestMatches/matches (3.30s)
+        --- PASS: TestMatches/matches/create-deployment (0.01s)
+        --- PASS: TestMatches/matches/deployment-exists (2.78s)
+        --- PASS: TestMatches/matches/delete-deployment (0.02s)
+PASS
+ok  	command-line-arguments	3.683s
+```
+
+You can see from the debug output above that `gdt` created the Deployment and
+then did a `kube.get` for the `deployments/nginx` Deployment. Initially
+(attempt 1), the `kube.assert.matches` assertion failed because the
+`status.readyReplicas` field was not present in the returned resource. `gdt`
+retried the `kube.get` call 4 more times (attempts 2-5), with attempts 2 and 3
+failed the existence check for the `status.readyReplicas` field and attempt 4
+failing the *value* check for the `status.readyReplicas` field being `1`
+instead of the expected `2`. Finally, when the Deployment was completely rolled
+out, attempt 5 succeeded in all the `kube.assert.matches` assertions.
+
 ## Determining Kubernetes config, context and namespace values
 
 When evaluating how to construct a Kubernetes client `gdt-kube` uses the following

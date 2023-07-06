@@ -6,10 +6,9 @@ tests:
   - name: create-deployment
     kube:
       create: testdata/manifests/nginx-deployment.yaml
-    wait:
-      # TODO(jaypipes): Remove after retries implemented
-      after: 10s
   - name: deployment-exists
+    timeout:
+      after: 20s
     kube:
       get: deployments/nginx
       assert:

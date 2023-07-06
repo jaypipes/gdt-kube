@@ -252,7 +252,7 @@ func TestMatches(t *testing.T) {
 
 	kfix := kindfix.New()
 
-	ctx := gdtcontext.New()
+	ctx := gdtcontext.New(gdtcontext.WithDebug(os.Stdout))
 	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
 	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
 
