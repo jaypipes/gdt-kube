@@ -28,6 +28,9 @@ const (
 	// defaultGetTimeout is used as a retry max time if the spec's Timeout has
 	// not been specified.
 	defaultGetTimeout = time.Second * 5
+	// fieldManagerName is the identifier for the field manager we specify in
+	// Apply requests.
+	fieldManagerName = "gdt-kube"
 )
 
 // Run executes the test described by the Kubernetes test. A new Kubernetes
@@ -46,6 +49,9 @@ func (s *Spec) Run(ctx context.Context, t *testing.T) error {
 		}
 		if s.Kube.Delete != "" {
 			err = s.runDelete(ctx, t, c)
+		}
+		if s.Kube.Apply != "" {
+			err = s.runApply(ctx, t, c)
 		}
 	})
 	return result.New(
@@ -213,6 +219,73 @@ func (s *Spec) runCreate(
 		)
 		// TODO(jaypipes): Clearly this is applying the same assertion to each
 		// object that was created, which is wrong. When I add the polymorphism
+		// to the Assertions struct, I will modify this block to look for an
+		// indexed set of error assertions.
+		a = newAssertions(s.Kube.Assert, err, obj)
+		if !a.OK() {
+			for _, f := range a.Failures() {
+				t.Error(f)
+			}
+		}
+	}
+	return nil
+}
+
+// runApply executes an Apply() call against the Kubernetes API server and
+// evaluates any assertions that have been set for the returned results.
+func (s *Spec) runApply(
+	ctx context.Context,
+	t *testing.T,
+	c *connection,
+) error {
+	var err error
+	var r io.Reader
+	if probablyFilePath(s.Kube.Apply) {
+		path := s.Kube.Apply
+		f, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		r = f
+	} else {
+		// Consider the string to be YAML/JSON content and marshal that into an
+		// unstructured.Unstructured that we then pass to Apply()
+		r = strings.NewReader(s.Kube.Apply)
+	}
+
+	objs, err := unstructuredFromReader(r)
+	if err != nil {
+		return err
+	}
+	for _, obj := range objs {
+		gvk := obj.GetObjectKind().GroupVersionKind()
+		ns := obj.GetNamespace()
+		if ns == "" {
+			ns = s.Namespace()
+		}
+		res, err := c.gvrFromGVK(gvk)
+		a := newAssertions(s.Kube.Assert, err, nil)
+		if !a.OK() {
+			for _, f := range a.Failures() {
+				t.Error(f)
+			}
+			return nil
+		}
+		obj, err := c.client.Resource(res).Namespace(ns).Apply(
+			ctx,
+			// NOTE(jaypipes): Not sure why a separate name argument is
+			// necessary considering `obj` is of type
+			// `*unstructured.Unstructured` and therefore has the `GetName()`
+			// method...
+			obj.GetName(),
+			obj,
+			// TODO(jaypipes): Not sure if this hard-coded options struct is
+			// always going to work. Maybe add ability to control it?
+			metav1.ApplyOptions{FieldManager: fieldManagerName, Force: true},
+		)
+		// TODO(jaypipes): Clearly this is applying the same assertion to each
+		// object that was applied, which is wrong. When I add the polymorphism
 		// to the Assertions struct, I will modify this block to look for an
 		// indexed set of error assertions.
 		a = newAssertions(s.Kube.Assert, err, obj)

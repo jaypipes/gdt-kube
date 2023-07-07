@@ -6,7 +6,7 @@ tests:
   - name: create-deployment
     kube:
       create: testdata/manifests/nginx-deployment.yaml
-  - name: deployment-exists
+  - name: deployment-matches-expected-fields
     timeout:
       after: 20s
     kube:
