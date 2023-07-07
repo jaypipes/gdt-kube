@@ -229,17 +229,17 @@ func validateResourceIdentifier(subject string) error {
 //
 // The following formats for a resource identifier string are allowed:
 //
-// * "pods" - pluralized resource type, refers to a collection of Pod resources
-// * "po" - shortname of a resource type, refers to a collection of Pod
-//   resources
-// * "pod" - singular of a resource type, refers to a collection of Pod
-//   resources (because no resource name has been specified)
-// * "pods/my-pod" - pluralized resource type along with a resource name,
-//   refers to a single Pod resource with the name "my-pod"
-// * "pod/my-pod" - singular resource type along with a resource name,
-//   refers to a single Pod resource with the name "my-pod"
-// * "po/my-pod" - shortname of a resource type along with a resource name,
-//   refers to a single Pod resource with the name "my-pod"
+//   - "pods" - pluralized resource type, refers to a collection of Pod resources
+//   - "po" - shortname of a resource type, refers to a collection of Pod
+//     resources
+//   - "pod" - singular of a resource type, refers to a collection of Pod
+//     resources (because no resource name has been specified)
+//   - "pods/my-pod" - pluralized resource type along with a resource name,
+//     refers to a single Pod resource with the name "my-pod"
+//   - "pod/my-pod" - singular resource type along with a resource name,
+//     refers to a single Pod resource with the name "my-pod"
+//   - "po/my-pod" - shortname of a resource type along with a resource name,
+//     refers to a single Pod resource with the name "my-pod"
 func resourceTypeAndNameFromIdentifier(identifier string) (string, string) {
 	rt := ""
 	rn := ""

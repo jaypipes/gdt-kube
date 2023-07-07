@@ -131,6 +131,9 @@ matches some expectation:
   that will be read from the Kubernetes API server.
 * `kube.create`: (optional) string containing either a file path to a YAML
   manifest or a string of raw YAML containing the resource(s) to create.
+* `kube.apply`: (optional) string containing either a file path to a YAML
+  manifest or a string of raw YAML containing the resource(s) for which
+  `gdt-kube` will perform a Kubernetes Apply call.
 * `kube.delete`: (optional) string containing either a resource specifier (e.g.
   `pods`, `po/nginx` or a file path to a YAML manifest containing resources
   that will be deleted.
@@ -239,9 +242,12 @@ tests:
   - kube.delete: pods/nginx
 ```
 
+### Executing arbitrary commands or shell scripts
+
 You can mix other `gdt` test types in a single `gdt` test scenario. For
-example, here we are testing the creation of a Pod, waiting a little while,
-then using the `gdt` `exec` test type to test SSH connectivity to the Pod.
+example, here we are testing the creation of a Pod, waiting a little while with
+the `wait.after` directive, then using the `gdt` `exec` test type to test SSH
+connectivity to the Pod.
 
 ```yaml
 name: create-check-ssh
@@ -250,9 +256,12 @@ require:
   - kind
 tests:
   - kube.create: manifests/deployment.yaml
-  - exec: sleep 30
+    wait:
+      after: 30s
   - exec: ssh -T someuser@ip
 ```
+
+### Asserting resource fields using `kube.assert.matches`
 
 A test that checks that a Deployment resource's `Status.ReadyReplicas` field
 is `2`. You do not need to specify all other `Deployment.Status` fields like
@@ -300,6 +309,79 @@ tests:
        matches:
          status:
            readyReplicas: 2
+```
+
+### Updating a resource and asserting corresponding field changes
+
+Here is an example of creating a Deployment with an initial `spec.replicas`
+count of 2, then applying a change to `spec.replicas` of 1, then asserting that
+the `status.readyReplicas` gets updated to 1.
+
+file `testdata/manifests/nginx-deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
+        ports:
+        - containerPort: 80
+```
+
+file `testdata/apply-deployment.yaml`:
+
+```yaml
+name: apply-deployment
+description: create, get, apply a change, get, delete a Deployment
+require:
+  - kind
+tests:
+  - name: create-deployment
+    kube:
+      create: testdata/manifests/nginx-deployment.yaml
+  - name: deployment-has-2-replicas
+    timeout:
+      after: 20s
+    kube:
+      get: deployments/nginx
+      assert:
+        matches:
+          status:
+            readyReplicas: 2
+  - name: apply-deployment-change
+    kube:
+      apply: |
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: nginx
+        spec:
+          replicas: 1
+  - name: deployment-has-1-replica
+    timeout:
+      after: 20s
+    kube:
+      get: deployments/nginx
+      assert:
+        matches:
+          status:
+            readyReplicas: 1
+  - name: delete-deployment
+    kube:
+      delete: deployments/nginx
 ```
 
 ### Timeouts and retrying `kube.get` assertions
