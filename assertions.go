@@ -5,11 +5,13 @@
 package kube
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	gdtjson "github.com/jaypipes/gdt-core/assertion/json"
 	gdterrors "github.com/jaypipes/gdt-core/errors"
 	gdttypes "github.com/jaypipes/gdt-core/types"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -97,6 +99,9 @@ type Expect struct {
 	//            readyReplicas: 2
 	// ```
 	Matches interface{} `yaml:"matches,omitempty"`
+	// JSON contains the assertions about JSON data in a response from the
+	// Kubernetes API server.
+	JSON *gdtjson.Expect `yaml:"json,omitempty"`
 }
 
 // assertions contains all assertions made for the exec test
@@ -159,6 +164,9 @@ func (a *assertions) OK() bool {
 		return false
 	}
 	if !a.matchesOK() {
+		return false
+	}
+	if !a.jsonOK() {
 		return false
 	}
 	return true
@@ -298,6 +306,34 @@ func (a *assertions) matchesOK() bool {
 		//		return false
 		//	}
 		//}
+	}
+	return true
+}
+
+// jsonOK returns true if the subject matches the JSON conditions, false
+// otherwise
+func (a *assertions) jsonOK() bool {
+	exp := a.exp
+	if exp.JSON != nil && a.hasSubject() {
+		var err error
+		var b []byte
+		res, ok := a.r.(*unstructured.Unstructured)
+		if ok {
+			if b, err = json.Marshal(res); err != nil {
+				panic("unable to marshal unstructured.Unstructured")
+			}
+		}
+		ja := gdtjson.New(exp.JSON, b)
+		if !ja.OK() {
+			// TODO(jaypipes): Re-enable this when update gdt-core
+			// `JSONAssertions.Terminal()` to not throw terminal error when
+			// things like JSONPath keys are not found.
+			// a.terminal = ja.Terminal()
+			for _, f := range ja.Failures() {
+				a.Fail(f)
+			}
+			return false
+		}
 	}
 	return true
 }

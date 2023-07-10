@@ -268,6 +268,32 @@ func TestMatches(t *testing.T) {
 	require.Nil(err, "%s", err)
 }
 
+func TestJSON(t *testing.T) {
+	skipIfKind(t)
+	require := require.New(t)
+
+	fp := filepath.Join("testdata", "json.yaml")
+	f, err := os.Open(fp)
+	require.Nil(err)
+
+	kfix := kindfix.New()
+
+	ctx := gdtcontext.New()
+	ctx = gdtcontext.RegisterPlugin(ctx, gdtkube.Plugin())
+	ctx = gdtcontext.RegisterFixture(ctx, "kind", kfix)
+
+	s, err := scenario.FromReader(
+		f,
+		scenario.WithPath(fp),
+		scenario.WithContext(ctx),
+	)
+	require.Nil(err)
+	require.NotNil(s)
+
+	err = s.Run(ctx, t)
+	require.Nil(err, "%s", err)
+}
+
 func TestApply(t *testing.T) {
 	skipIfKind(t)
 	require := require.New(t)
