@@ -37,6 +37,11 @@ func (s *Spec) UnmarshalYAML(node *yaml.Node) error {
 				return err
 			}
 			s.Kube = ks
+		case "kube.get":
+			if valNode.Kind != yaml.ScalarNode {
+				return errors.ExpectedScalarAt(valNode)
+			}
+			s.KubeGet = valNode.Value
 		case "kube.create":
 			if valNode.Kind != yaml.ScalarNode {
 				return errors.ExpectedScalarAt(valNode)
@@ -74,6 +79,9 @@ func (s *Spec) UnmarshalYAML(node *yaml.Node) error {
 // long-form KubeSpec is not present.
 func validateShortcuts(s *Spec) error {
 	foundShortcuts := 0
+	if s.KubeGet != "" {
+		foundShortcuts += 1
+	}
 	if s.KubeCreate != "" {
 		foundShortcuts += 1
 	}
@@ -104,6 +112,9 @@ func expandShortcut(s *Spec) {
 		return
 	}
 	ks := &KubeSpec{}
+	if s.KubeGet != "" {
+		ks.Get = s.KubeGet
+	}
 	if s.KubeCreate != "" {
 		ks.Create = s.KubeCreate
 	}

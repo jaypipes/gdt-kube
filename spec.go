@@ -80,6 +80,18 @@ type Spec struct {
 	// either a file path or raw YAML content describing a Kubernetes resource
 	// to call `kubectl create` with.
 	KubeCreate string `yaml:"kube.create,omitempty"`
+	// KubeGet is a string containing an argument to `kubectl get` and must be
+	// one of the following:
+	//
+	// - a file path to a manifest that will be read and the resources within
+	//   retrieved via `kubectl get`
+	// - a resource kind or kind alias, e.g. "pods", "po", followed by one of
+	//   the following:
+	//   * a space or `/` character followed by the resource name to get only a
+	//     resource with that name.
+	//   * a space followed by `-l ` followed by a label to get resources
+	//     having such a label.
+	KubeGet string `yaml:"kube.get,omitempty"`
 	// KubeApply is a shortcut for the `KubeSpec.Apply`. It is a string
 	// containing a file path or raw YAML content describing a Kubernetes
 	// resource to call `kubectl apply` with.
@@ -110,6 +122,12 @@ func (s *Spec) Title() string {
 	if s.Kube == nil {
 		// Shouldn't happen because of parsing, but you never know...
 		return ""
+	}
+	if s.Kube.Get != "" {
+		get := s.Kube.Get
+		if probablyFilePath(get) {
+			return "kube.get:" + filepath.Base(get)
+		}
 	}
 	if s.Kube.Create != "" {
 		create := s.Kube.Create

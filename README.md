@@ -533,7 +533,7 @@ file: `matches_test.go`
 ```go
 import (
     "github.com/jaypipes/gdt"
-    . "github.com/jaypipes/gdt-kube"
+    _ "github.com/jaypipes/gdt-kube"
     kindfix "github.com/jaypipes/gdt-kube/fixture/kind"
 )
 

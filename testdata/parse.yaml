@@ -27,3 +27,8 @@ tests:
  - name: delete a pod from a file
    kube:
      delete: testdata/manifests/nginx-pod.yaml
+ - name: fetch a pod via kube.get shortcut
+   kube.get: pods/name
+ - name: fetch a pod via long-form kube:get
+   kube:
+     get: pods/name

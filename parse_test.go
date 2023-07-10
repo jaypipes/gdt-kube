@@ -381,6 +381,27 @@ spec:
 				Delete: "testdata/manifests/nginx-pod.yaml",
 			},
 		},
+		&gdtkube.Spec{
+			Spec: gdttypes.Spec{
+				Index:    4,
+				Name:     "fetch a pod via kube.get shortcut",
+				Defaults: &gdttypes.Defaults{},
+			},
+			KubeGet: "pods/name",
+			Kube: &gdtkube.KubeSpec{
+				Get: "pods/name",
+			},
+		},
+		&gdtkube.Spec{
+			Spec: gdttypes.Spec{
+				Index:    5,
+				Name:     "fetch a pod via long-form kube:get",
+				Defaults: &gdttypes.Defaults{},
+			},
+			Kube: &gdtkube.KubeSpec{
+				Get: "pods/name",
+			},
+		},
 	}
 	assert.Equal(expTests, sc.Tests)
 }
