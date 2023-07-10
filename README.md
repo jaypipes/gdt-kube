@@ -158,6 +158,22 @@ matches some expectation:
   the value of the fields match. Only scalar fields are matched entirely.
   In other words, you do not need to specify every field of a struct field
   in order to compare the value of a single field in the nested struct.
+* `kube.assert.json`: (optional) object describing the assertions to make about
+  resource(s) returned from the `kube.get` call to the Kubernetes API server.
+* `kube.assert.json.len`: (optional) integer representing the number of bytes in the
+  resulting JSON object after successfully parsing the resource.
+* `kube.assert.json.paths`: (optional) map of strings where the keys of the map
+  are JSONPath expressions and the values of the map are the expected value to
+  be found when evaluating the JSONPath expression
+* `kube.assert.json.path_formats`: (optional) map of strings where the keys of the map are
+  JSONPath expressions and the values of the map are the expected format of the
+  value to be found when evaluating the JSONPath expression. See the
+  [list of valid format strings](#valid-format-strings)
+* `kube.assert.json.schema`: (optional) string containing a filepath to a
+  JSONSchema document.  If present, the resource's structure will be validated
+  against this JSONSChema document.
+
+## Examples
 
 Here are some examples of `gdt-kube` tests.
 
@@ -263,8 +279,14 @@ tests:
 
 ### Asserting resource fields using `kube.assert.matches`
 
-A test that checks that a Deployment resource's `Status.ReadyReplicas` field
-is `2`. You do not need to specify all other `Deployment.Status` fields like
+The `kube.assert.matches` field of a `gdt-kube` test Spec allows a test author
+to specify expected fields and those field contents in a resource that was
+returned by the Kubernetes API server from the result of a `kube.get` call.
+
+Suppose you have a Deployment resource and you want to write a test that checks
+that a Deployment resource's `Status.ReadyReplicas` field is `2`.
+
+You do not need to specify all other `Deployment.Status` fields like
 `Status.Replicas` in order to match the `Status.ReadyReplicas` field value. You
 only need to include the `Status.ReadyReplicas` field in the `Matches` value as
 these examples demonstrate:
@@ -309,6 +331,88 @@ tests:
        matches:
          status:
            readyReplicas: 2
+```
+
+### Asserting resource fields using `kube.assert.json`
+
+The `kube.assert.json` field of a `gdt-kube` test Spec allows a test author to
+specify expected fields, the value of those fields as well as the format of
+field values in a resource that was returned by the Kubernetes API server from
+the result of a `kube.get` call.
+
+Suppose you have a Deployment resource and you want to write a test that checks
+that a Deployment resource's `Status.ReadyReplicas` field is `2`.
+
+You can specify this expectation using the `kube.assert.json.paths` field,
+which is a `map[string]interface{}` that takes map keys that are JSONPath
+expressions and map values of what the field at that JSONPath expression should
+contain:
+
+```yaml
+tests:
+ - name: check deployment's ready replicas is 2
+   kube:
+     get: deployments/my-deployment
+     assert:
+       json:
+        paths:
+          $.status.readyReplicas: 2 
+```
+
+JSONPath expressions can be fairly complex, allowing the test author to, for
+example, assert the value of a nested map field with a particular key, as this
+example shows:
+
+```yaml
+tests:
+ - name: check deployment's pod template "app" label is "nginx"
+   kube:
+     get: deployments/my-deployment
+     assert:
+       json:
+        paths:
+          $.spec.template.labels["app"]: nginx
+```
+
+You can check that the value of a particular field at a JSONPath is formatted
+in a particular fashion using `kube.assert.json.path_formats`. This is a map,
+keyed by JSONPath expression, of the data format the value of the field at that
+JSONPath expression should have. Valid data formats are:
+
+* `date`
+* `date-time`
+* `email`
+* `hostname`
+* `idn-email`
+* `ipv4`
+* `ipv6`
+* `iri`
+* `iri-reference`
+* `json-pointer`
+* `regex`
+* `relative-json-pointer`
+* `time`
+* `uri`
+* `uri-reference`
+* `uri-template`
+* `uuid`
+* `uuid4`
+
+[Read more about JSONSchema formats](https://json-schema.org/understanding-json-schema/reference/string.html#built-in-formats).
+
+For example, suppose we wanted to verify that a Deployment's `metadata.uid`
+field was a UUID-4 and that its `metadata.creationTimestamp` field was a
+date-time timestamp:
+
+```yaml
+tests:
+  - kube:
+      get: deployments/nginx
+      assert:
+        json:
+          path_formats:
+            $.metadata.uid: uuid4
+            $.metadata.creationTimestamp: date-time
 ```
 
 ### Updating a resource and asserting corresponding field changes
