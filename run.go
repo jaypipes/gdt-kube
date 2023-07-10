@@ -16,6 +16,7 @@ import (
 
 	backoff "github.com/cenkalti/backoff/v4"
 	"github.com/jaypipes/gdt-core/debug"
+	"github.com/jaypipes/gdt-core/parse"
 	"github.com/jaypipes/gdt-core/result"
 	gdttypes "github.com/jaypipes/gdt-core/types"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -307,16 +308,19 @@ func unstructuredFromReader(
 
 	objs := []*unstructured.Unstructured{}
 	for {
-		data, err := yr.Read()
+		raw, err := yr.Read()
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, err
 		}
+		data := parse.ExpandWithFixedDoubleDollar(string(raw))
 
 		obj := &unstructured.Unstructured{}
-		decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewBuffer(data), len(data))
+		decoder := yaml.NewYAMLOrJSONDecoder(
+			bytes.NewBuffer([]byte(data)), len(data),
+		)
 		if err = decoder.Decode(obj); err != nil {
 			return nil, err
 		}

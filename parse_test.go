@@ -310,6 +310,8 @@ func TestParse(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
+	t.Setenv("pod_name", "foo")
+
 	fp := filepath.Join("testdata", "parse.yaml")
 	f, err := os.Open(fp)
 	require.Nil(err)
@@ -400,6 +402,16 @@ spec:
 			},
 			Kube: &gdtkube.KubeSpec{
 				Get: "pods/name",
+			},
+		},
+		&gdtkube.Spec{
+			Spec: gdttypes.Spec{
+				Index:    6,
+				Name:     "fetch a pod with envvar substitution",
+				Defaults: &gdttypes.Defaults{},
+			},
+			Kube: &gdtkube.KubeSpec{
+				Get: "pods/foo",
 			},
 		},
 	}

@@ -32,3 +32,6 @@ tests:
  - name: fetch a pod via long-form kube:get
    kube:
      get: pods/name
+ - name: fetch a pod with envvar substitution
+   kube:
+     get: pods/${pod_name}
