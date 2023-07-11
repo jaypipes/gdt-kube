@@ -12,55 +12,55 @@ import (
 )
 
 var (
-	// ErrInvalidMoreThanOneShortcut is returned when the test author included
+	// ErrMoreThanOneShortcut is returned when the test author included
 	// more than one shortcut (e.g. `kube.create` or `kube.apply`) in the same
 	// test spec.
-	ErrInvalidMoreThanOneShortcut = fmt.Errorf(
+	ErrMoreThanOneShortcut = fmt.Errorf(
 		"%w: you may only specify a single shortcut field (e.g. "+
 			"`kube.create` or `kube.apply`",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
-	// ErrInvalidEitherShortcutOrKubeSpec is returned when the test author
+	// ErrEitherShortcutOrKubeSpec is returned when the test author
 	// included both a shortcut (e.g. `kube.create` or `kube.apply`) AND the
 	// long-form `kube` object in the same test spec.
-	ErrInvalidEitherShortcutOrKubeSpec = fmt.Errorf(
+	ErrEitherShortcutOrKubeSpec = fmt.Errorf(
 		"%w: either specify a full KubeSpec in the `kube` field or specify "+
 			"one of the shortcuts (e.g. `kube.create` or `kube.apply`",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
-	// ErrInvalidMoreThanOneKubeAction is returned when the test author
+	// ErrMoreThanOneKubeAction is returned when the test author
 	// included more than one Kubernetes action (e.g. `create` or `apply`) in
 	// the same KubeSpec.
-	ErrInvalidMoreThanOneKubeAction = fmt.Errorf(
+	ErrMoreThanOneKubeAction = fmt.Errorf(
 		"%w: you may only specify a single Kubernetes action field "+
 			"(e.g. `create`, `apply` or `delete`) in the `kube` object. ",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
-	// ErrInvalidKubeConfigNotFound is returned when a kubeconfig path points
+	// ErrKubeConfigNotFound is returned when a kubeconfig path points
 	// to a file that does not exist.
-	ErrInvalidKubeConfigNotFound = fmt.Errorf(
+	ErrKubeConfigNotFound = fmt.Errorf(
 		"%w: specified kube config path not found",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
-	// ErrInvalidResourceSpecifier is returned when the test author uses a
+	// ErrResourceSpecifier is returned when the test author uses a
 	// resource specifier for the `kube.get` or `kube.delete` fields that is
 	// not valid.
-	ErrInvalidResourceSpecifier = fmt.Errorf(
+	ErrResourceSpecifierInvalid = fmt.Errorf(
 		"%w: invalid resource specifier",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
-	// ErrInvalidResourceSpecifierOrFilepath is returned when the test author
+	// ErrResourceSpecifierOrFilepath is returned when the test author
 	// uses a resource specifier for the `kube.delete` fields that is not valid
 	// or is not a filepath.
-	ErrInvalidResourceSpecifierOrFilepath = fmt.Errorf(
+	ErrResourceSpecifierInvalidOrFilepath = fmt.Errorf(
 		"%w: invalid resource specifier or filepath",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
 	// ErrMatchesInvalid is returned when the `Kube.Assert.Matches` value is
 	// malformed.
 	ErrMatchesInvalid = fmt.Errorf(
 		"%w: `kube.assert.matches` not well-formed",
-		gdterrors.ErrInvalid,
+		gdterrors.ErrParse,
 	)
 	// ErrResourceUnknown is returned when an unknown resource kind is
 	// specified for a create/apply/delete target. This is a runtime error
@@ -85,21 +85,23 @@ var (
 	)
 )
 
-// KubeConfigNotFound returns ErrInvalidKubeConfigNotFound for a given filepath
+// KubeConfigNotFound returns ErrKubeConfigNotFound for a given filepath
 func KubeConfigNotFound(path string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidKubeConfigNotFound, path)
+	return fmt.Errorf("%w: %s", ErrKubeConfigNotFound, path)
 }
 
-// InvalidResourceSpecifier returns ErrInvalidResourceSpecifier for a given
+// InvalidResourceSpecifier returns ErrResourceSpecifier for a given
 // supplied resource specifier.
 func InvalidResourceSpecifier(subject string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifier, subject)
+	return fmt.Errorf("%w: %s", ErrResourceSpecifierInvalid, subject)
 }
 
 // InvalidResourceSpecifierOrFilepath returns
-// ErrInvalidResourceSpecifierOrFilepath for a given supplied subject.
+// ErrResourceSpecifierOrFilepath for a given supplied subject.
 func InvalidResourceSpecifierOrFilepath(subject string) error {
-	return fmt.Errorf("%w: %s", ErrInvalidResourceSpecifierOrFilepath, subject)
+	return fmt.Errorf(
+		"%w: %s", ErrResourceSpecifierInvalidOrFilepath, subject,
+	)
 }
 
 // ResourceUnknown returns ErrRuntimeResourceUnknown for a given kind
@@ -122,14 +124,14 @@ func MatchesInvalid(matches interface{}) error {
 	)
 }
 
-// MatchesInvalidUnmarshalError returns ErrMatchesInvalid when a `kube.assert.matches` field
-// contains invalid YAML content.
+// MatchesInvalidUnmarshalError returns ErrMatchesInvalid when a
+// `kube.assert.matches` field contains invalid YAML content.
 func MatchesInvalidUnmarshalError(err error) error {
 	return fmt.Errorf("%w: %s", ErrMatchesInvalid, err)
 }
 
-// MatchesNotEqual returns ErrMatchesNotEqual when a `kube.assert.matches` object
-// did not match the returned resource.
+// MatchesNotEqual returns ErrMatchesNotEqual when a `kube.assert.matches`
+// object did not match the returned resource.
 func MatchesNotEqual(msg string) error {
 	return fmt.Errorf("%w: %s", ErrMatchesNotEqual, msg)
 }

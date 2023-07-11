@@ -41,7 +41,7 @@ func TestBadDefaults(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, errors.ErrInvalidExpectedMap)
+	assert.ErrorIs(err, errors.ErrExpectedMap)
 	assert.Nil(s)
 }
 
@@ -62,8 +62,8 @@ func TestFailureDefaultsConfigNotFound(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidKubeConfigNotFound)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrKubeConfigNotFound)
+	assert.ErrorIs(err, errors.ErrParse)
 	assert.Nil(s)
 }
 
@@ -84,8 +84,8 @@ func TestFailureBothShortcutAndKubeSpec(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidEitherShortcutOrKubeSpec)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrEitherShortcutOrKubeSpec)
+	assert.ErrorIs(err, errors.ErrParse)
 	assert.Nil(s)
 }
 
@@ -106,8 +106,8 @@ func TestFailureMoreThanOneShortcut(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidMoreThanOneShortcut)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrMoreThanOneShortcut)
+	assert.ErrorIs(err, errors.ErrParse)
 	assert.Nil(s)
 }
 
@@ -128,8 +128,8 @@ func TestFailureMoreThanOneKubeAction(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidMoreThanOneKubeAction)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrMoreThanOneKubeAction)
+	assert.ErrorIs(err, errors.ErrParse)
 	assert.Nil(s)
 }
 
@@ -150,8 +150,8 @@ func TestFailureInvalidResourceSpecifierNoMultipleResources(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	require.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifier)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrResourceSpecifierInvalid)
+	assert.ErrorIs(err, errors.ErrParse)
 	require.Nil(s)
 }
 
@@ -172,8 +172,8 @@ func TestFailureInvalidResourceSpecifierMutipleForwardSlashes(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	require.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifier)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrResourceSpecifierInvalid)
+	assert.ErrorIs(err, errors.ErrParse)
 	require.Nil(s)
 }
 
@@ -194,8 +194,8 @@ func TestFailureInvalidDeleteNotFilepathOrResourceSpecifier(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	require.NotNil(err)
-	assert.ErrorIs(err, gdtkube.ErrInvalidResourceSpecifierOrFilepath)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, gdtkube.ErrResourceSpecifierInvalidOrFilepath)
+	assert.ErrorIs(err, errors.ErrParse)
 	require.Nil(s)
 }
 
@@ -216,8 +216,8 @@ func TestFailureCreateFileNotFound(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	require.NotNil(err)
-	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, errors.ErrFileNotFound)
+	assert.ErrorIs(err, errors.ErrParse)
 	require.Nil(s)
 }
 
@@ -238,8 +238,8 @@ func TestDeleteFileNotFound(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	require.NotNil(err)
-	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
-	assert.ErrorIs(err, errors.ErrInvalid)
+	assert.ErrorIs(err, errors.ErrFileNotFound)
+	assert.ErrorIs(err, errors.ErrParse)
 	require.Nil(s)
 }
 
@@ -260,7 +260,7 @@ func TestFailureBadMatchesFileNotFound(t *testing.T) {
 		scenario.WithContext(ctx),
 	)
 	assert.NotNil(err)
-	assert.ErrorIs(err, errors.ErrInvalidFileNotFound)
+	assert.ErrorIs(err, errors.ErrFileNotFound)
 	assert.Nil(s)
 }
 

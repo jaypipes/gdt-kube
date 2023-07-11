@@ -93,13 +93,13 @@ func validateShortcuts(s *Spec) error {
 	}
 	if s.Kube == nil {
 		if foundShortcuts > 1 {
-			return ErrInvalidMoreThanOneShortcut
+			return ErrMoreThanOneShortcut
 		} else if foundShortcuts == 0 {
-			return ErrInvalidEitherShortcutOrKubeSpec
+			return ErrEitherShortcutOrKubeSpec
 		}
 	} else {
 		if foundShortcuts > 0 {
-			return ErrInvalidEitherShortcutOrKubeSpec
+			return ErrEitherShortcutOrKubeSpec
 		}
 	}
 	return nil
@@ -151,7 +151,7 @@ func moreThanOneAction(s *Spec) bool {
 // appropriately.
 func validateKubeSpec(s *Spec) error {
 	if moreThanOneAction(s) {
-		return ErrInvalidMoreThanOneKubeAction
+		return ErrMoreThanOneKubeAction
 	}
 	if s.Kube.Get != "" {
 		if err := validateResourceIdentifier(s.Kube.Get); err != nil {

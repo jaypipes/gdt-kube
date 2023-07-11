@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/jaypipes/gdt v1.9.0
-	github.com/jaypipes/gdt-core v1.9.4
+	github.com/jaypipes/gdt-core v1.10.0
 	github.com/samber/lo v1.38.1
 	github.com/stretchr/testify v1.8.4
 	gopkg.in/yaml.v3 v3.0.1
